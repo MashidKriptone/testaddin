@@ -1,0 +1,79 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    align-items: center;
+    background-color: #0078D4;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5em;
+    flex: 1;
+    text-align: center;
+}
+
+main {
+    padding: 20px;
+    max-width: 600px;
+    margin: 20px auto;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    font-size: 1.2em;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    font-size: 1em;
+    color: white;
+    background-color: #0078D4;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-bottom: 20px;
+}
+
+button:hover {
+    background-color: #005a9e;
+}
+
+.email-data {
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.email-data p {
+    margin: 10px 0;
+    font-size: 0.9em;
+}
+
+.email-data strong {
+    color: #0078D4;
+}
+
+.kntrol {
+    color: #1b326a;
+}
+
+.email {
+    color: #fabf48;
+}
