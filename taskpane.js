@@ -2,9 +2,8 @@
 
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
-        // Register the event handler for the ItemSend event
-        Office.context.mailbox.item.addHandlerAsync(Office.EventType.ItemSend, validateSubjectAndCC);
-        console.log('Add-in is running in background.');
+        Office.context.mailbox.item.addHandlerAsync(Office.EventType.ItemSend, validateAndTrackEmail);
+        console.log("Add-in is running.");
     }
 });
 
@@ -18,7 +17,7 @@ const regexPatterns = {
 };
 
 // Event handler for the ItemSend event
-async function validateSubjectAndCC(eventArgs) {
+async function validateAndTrackEmail(eventArgs) {
     try {
         const item = Office.context.mailbox.item;
 

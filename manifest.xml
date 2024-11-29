@@ -13,7 +13,7 @@
   </Hosts>
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.1" />
+      <Set Name="Mailbox" MinVersion="1.8" />
     </Sets>
   </Requirements>
   <FormSettings>
@@ -28,7 +28,6 @@
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
   </Rule>
-  <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="MailHost">
@@ -60,21 +59,21 @@
     </Hosts>
     <Resources>
       <bt:Images>
-          <bt:Image id="icon16" DefaultValue="https://i.postimg.cc/QthbGV5h/Kntrol-Email-Icon-16.png" />
-    <bt:Image id="icon32" DefaultValue="https://i.postimg.cc/tTqhvwQg/Kntrol-Email-Icon-32.png" />
-    <bt:Image id="icon64" DefaultValue="https://i.postimg.cc/59HbrwP1/download-resizehood-com-1.png" />
-    <bt:Image id="icon80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png" />
-    <bt:Image id="icon128" DefaultValue="https://i.postimg.cc/5NryZGvt/Kntrol-Email-Icon-128.png" />
+        <bt:Image id="icon16" DefaultValue="https://i.postimg.cc/QthbGV5h/Kntrol-Email-Icon-16.png" />
+        <bt:Image id="icon32" DefaultValue="https://i.postimg.cc/tTqhvwQg/Kntrol-Email-Icon-32.png" />
+        <bt:Image id="icon64" DefaultValue="https://i.postimg.cc/59HbrwP1/download-resizehood-com-1.png" />
+        <bt:Image id="icon80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png" />
+        <bt:Image id="icon128" DefaultValue="https://i.postimg.cc/5NryZGvt/Kntrol-Email-Icon-128.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="groupLabel" DefaultValue="SaaS Sample" />
+        <bt:String id="groupLabel" DefaultValue="KntrolEmail Tools" />
         <bt:String id="TaskpaneButton.Label" DefaultValue="Open Add-in" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open Add-in Tooltip" />
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the add-in to track and validate emails." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
