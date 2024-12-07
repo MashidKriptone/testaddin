@@ -8,6 +8,7 @@
   <Description DefaultValue="KntrolEMAIL Description" />
   <IconUrl DefaultValue="https://i.postimg.cc/59HbrwP1/download-resizehood-com-1.png" />
   <HighResolutionIconUrl DefaultValue="https://i.postimg.cc/MHDyJhD3/download-resizehood-com-2.png" />
+  <SupportUrl DefaultValue="https://www.kriptone.com" />
   <Hosts>
     <Host Name="Mailbox" />
   </Hosts>
@@ -32,6 +33,7 @@
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
+          <FunctionFile resid="FunctionFile.Url" />
          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
   <OfficeTab id="TabDefault">
     <Group id="customSendGroup">
@@ -45,7 +47,7 @@
         <Icon>
           <bt:Image size="16" resid="icon16" />
           <bt:Image size="32" resid="icon32" />
-          <bt:Image size="64" resid="icon64" />
+          <bt:Image size="80" resid="icon80" />
         </Icon>
         <Action xsi:type="ExecuteFunction">
           <FunctionName>customSendFunction</FunctionName>
@@ -67,11 +69,12 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
-        <bt:Url id="Function.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
+        <bt:Url id="FunctionFile.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
       </bt:Urls>
       <bt:ShortStrings>
-  <bt:String id="SendButtonGroup.Label" DefaultValue="Open Add-in" />
+  <bt:String id="SendButtonGroup.Label" DefaultValue="Custom Actions" />
   <bt:String id="SendButton.Label" DefaultValue="Custom Send" />
+  <bt:String id="SendButton.Title" DefaultValue="KntrolEMAIL" />
 </bt:ShortStrings>
 <bt:LongStrings>
   <bt:String id="SendButton.Tooltip" DefaultValue="Validates and sends the email." />
