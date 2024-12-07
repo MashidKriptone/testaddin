@@ -32,28 +32,28 @@
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
-          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
-            <OfficeTab id="TabDefault">
-              <Group id="msgComposeCmdGroup">
-                <Label resid="groupLabel" />
-                <Control xsi:type="Button" id="msgComposeInsertFilenamesButton">
-                  <Label resid="TaskpaneButton.Label" />
-                  <Supertip>
-                    <Title resid="TaskpaneButton.Title" />
-                    <Description resid="TaskpaneButton.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="icon16" />
-                    <bt:Image size="32" resid="icon32" />
-                    <bt:Image size="64" resid="icon64" />
-                  </Icon>
-                  <Action xsi:type="ShowTaskpane">
-                    <SourceLocation resid="Taskpane.Url" />
-                  </Action>
-                </Control>
-              </Group>
-            </OfficeTab>
-          </ExtensionPoint>
+         <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+  <OfficeTab id="TabDefault">
+    <Group id="customSendGroup">
+      <Label resid="SendButtonGroup.Label" />
+      <Control xsi:type="Button" id="customSendButton">
+        <Label resid="SendButton.Label" />
+        <Supertip>
+          <Title resid="SendButton.Title" />
+          <Description resid="SendButton.Tooltip" />
+        </Supertip>
+        <Icon>
+          <bt:Image size="16" resid="icon16" />
+          <bt:Image size="32" resid="icon32" />
+          <bt:Image size="64" resid="icon64" />
+        </Icon>
+        <Action xsi:type="ExecuteFunction">
+          <FunctionName>customSendFunction</FunctionName>
+        </Action>
+      </Control>
+    </Group>
+  </OfficeTab>
+</ExtensionPoint>
         </DesktopFormFactor>
       </Host>
     </Hosts>
@@ -67,14 +67,15 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
+        <bt:Url id="Function.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="groupLabel" DefaultValue="KntrolEmail Tools" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Open Add-in" />
-      </bt:ShortStrings>
-      <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the add-in to track and validate emails." />
-      </bt:LongStrings>
+  <bt:String id="SendButtonGroup.Label" DefaultValue="Open Add-in" />
+  <bt:String id="SendButton.Label" DefaultValue="Custom Send" />
+</bt:ShortStrings>
+<bt:LongStrings>
+  <bt:String id="SendButton.Tooltip" DefaultValue="Validates and sends the email." />
+</bt:LongStrings>
     </Resources>
   </VersionOverrides>
 </OfficeApp>
