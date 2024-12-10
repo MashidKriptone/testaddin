@@ -1,20 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
+  <!-- Begin Basic Settings: Add-in metadata, used for all versions of Office unless override provided. -->
   <Id>93b73d52-86d7-45a5-9747-48cc47740f57</Id>
-  <Version>1.0.0.4</Version>
+  <Version>1.0.0.0</Version>
   <ProviderName>Kriptone</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="KntrolEMAIL" />
   <Description DefaultValue="KntrolEMAIL Description" />
   <IconUrl DefaultValue="https://i.postimg.cc/59HbrwP1/download-resizehood-com-1.png" />
   <HighResolutionIconUrl DefaultValue="https://i.postimg.cc/MHDyJhD3/download-resizehood-com-2.png" />
-  <SupportUrl DefaultValue="https://www.kriptone.com" />
+  <SupportUrl DefaultValue="https://kriptone.com" />
   <Hosts>
     <Host Name="Mailbox" />
   </Hosts>
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.8" />
+      <Set Name="Mailbox" MinVersion="1.1" />
     </Sets>
   </Requirements>
   <FormSettings>
@@ -25,60 +26,110 @@
       </DesktopSettings>
     </Form>
   </FormSettings>
+
   <Permissions>ReadWriteItem</Permissions>
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
   </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <!--BeginAddinCommandsMode integration-->
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
-    <Hosts>
-      <Host xsi:type="MailHost">
-        <DesktopFormFactor>
-          <FunctionFile resid="FunctionFile.Url" />
-         <ExtensionPoint xsi:type="MessageComposeCommandSurface">
-  <OfficeTab id="TabDefault">
-    <Group id="customSendGroup">
-      <Label resid="SendButtonGroup.Label" />
-      <Control xsi:type="Button" id="customSendButton">
-        <Label resid="SendButton.Label" />
-        <Supertip>
-          <Title resid="SendButton.Title" />
-          <Description resid="SendButton.Tooltip" />
-        </Supertip>
-        <Icon>
-          <bt:Image size="16" resid="icon16" />
-          <bt:Image size="32" resid="icon32" />
-          <bt:Image size="80" resid="icon80" />
-        </Icon>
-        <Action xsi:type="ExecuteFunction">
-          <FunctionName>customSendFunction</FunctionName>
-        </Action>
-      </Control>
-    </Group>
-  </OfficeTab>
-</ExtensionPoint>
-        </DesktopFormFactor>
-      </Host>
-    </Hosts>
-    <Resources>
-      <bt:Images>
+    <!-- On-send requires VersionOverridesV1_1 -->
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.3">
+          <bt:Set Name="Mailbox" />
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <!-- The function file and function name to call on message send. -->
+            <!-- In this case, the function validateBody will be called within the JavaScript code referenced in residUILessFunctionFileUrl. -->
+            <FunctionFile resid="residUILessFunctionFileUrl" />
+            <ExtensionPoint xsi:type="Events">
+              <Event Type="ItemSent" FunctionExecution="synchronous" FunctionName="onItemSend" />
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgComposeCmdGroup">
+                  <Label resid="groupLabel" />
+                  <Control xsi:type="Button" id="msgComposeInsertFilenamesButton">
+                    <Label resid="TaskpaneButton.Label" />
+                    <Supertip>
+                      <Title resid="TaskpaneButton.Title" />
+                      <Description resid="TaskpaneButton.Tooltip" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16" />
+                      <bt:Image size="32" resid="icon32" />
+                      <bt:Image size="80" resid="icon80" />
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+          <MobileFormFactor>
+            <!-- Configures the add-in button to appear in the Appointment Attendee surface of Outlook on mobile devices. -->
+            <ExtensionPoint xsi:type="MobileLogEventAppointmentAttendee">
+              <Control xsi:type="MobileButton" id="appointmentReadFunctionButton">
+                <Label resid="residLabel"/>
+                <Icon>
+                  <bt:Image size="25" scale="1" resid="icon-16"/>
+                  <bt:Image size="25" scale="2" resid="icon-16"/>
+                  <bt:Image size="25" scale="3" resid="icon-16"/>
+
+                  <bt:Image size="32" scale="1" resid="icon-32"/>
+                  <bt:Image size="32" scale="2" resid="icon-32"/>
+                  <bt:Image size="32" scale="3" resid="icon-32"/>
+
+                  <bt:Image size="48" scale="1" resid="icon-48"/>
+                  <bt:Image size="48" scale="2" resid="icon-48"/>
+                  <bt:Image size="48" scale="3" resid="icon-48"/>
+                </Icon>
+                <Action xsi:type="ShowTaskpane">
+                  <SourceLocation resid="Taskpane.Url"/>
+                </Action> 
+              </Control>
+            </ExtensionPoint>
+          </MobileFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
         <bt:Image id="icon16" DefaultValue="https://i.postimg.cc/QthbGV5h/Kntrol-Email-Icon-16.png" />
         <bt:Image id="icon32" DefaultValue="https://i.postimg.cc/tTqhvwQg/Kntrol-Email-Icon-32.png" />
         <bt:Image id="icon64" DefaultValue="https://i.postimg.cc/59HbrwP1/download-resizehood-com-1.png" />
         <bt:Image id="icon80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png" />
         <bt:Image id="icon128" DefaultValue="https://i.postimg.cc/5NryZGvt/Kntrol-Email-Icon-128.png" />
-      </bt:Images>
-      <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
-        <bt:Url id="FunctionFile.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
-      </bt:Urls>
-      <bt:ShortStrings>
-  <bt:String id="SendButtonGroup.Label" DefaultValue="Custom Actions" />
-  <bt:String id="SendButton.Label" DefaultValue="Custom Send" />
-  <bt:String id="SendButton.Title" DefaultValue="KntrolEMAIL" />
-</bt:ShortStrings>
-<bt:LongStrings>
-  <bt:String id="SendButton.Tooltip" DefaultValue="Validates and sends the email." />
-</bt:LongStrings>
-    </Resources>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
+          <bt:Url id="residUILessFunctionFileUrl" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="groupLabel" DefaultValue="SaaS Sample" />
+          <bt:String id="customTabLabel" DefaultValue="My Add-in Tab" />
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Open Add-in Label" />
+          <bt:String id="TaskpaneButton.Title" DefaultValue="Open Add-in Title" />
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open Add-in Tooltip" />
+          <bt:String id="GetStarted.Title" DefaultValue="Microsoft Graph data add-in has loaded successfully." />
+          <bt:String id="residLabel4" DefaultValue="OneDrive Files" />
+          <bt:String id="residDescription" DefaultValue="Log appointment notes and other details to Contoso CRM."/>
+          <bt:String id="residLabel" DefaultValue="Log to Contoso"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open Add-in Tooltip" />
+          <bt:String id="TaskpaneButton.Title" DefaultValue="Open Add-in Title" />
+          <bt:String id="GetStarted.Description" DefaultValue="Choose Open add-in, then Connect to OneDrive to get started." />
+          <bt:String id="residTooltip" DefaultValue="Log notes to Contoso CRM for this appointment."/>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
   </VersionOverrides>
 </OfficeApp>
