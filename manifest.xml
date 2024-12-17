@@ -114,7 +114,7 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
         <bt:Url id="WebViewRuntime.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
         <!-- Entry needed for classic Outlook on Windows. -->
-        <bt:Url id="JSRuntime.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
+        <bt:Url id="JSRuntime.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.js" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Contoso Add-in"/>
