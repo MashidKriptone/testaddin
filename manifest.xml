@@ -21,7 +21,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
+        <SourceLocation DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
         <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -110,9 +110,9 @@
         <bt:Image id="Icon.80x80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
-        <bt:Url id="WebViewRuntime.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
+        <bt:Url id="WebViewRuntime.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
         <!-- Entry needed for classic Outlook on Windows. -->
         <bt:Url id="JSRuntime.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.js" />
       </bt:Urls>
