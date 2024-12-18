@@ -3,7 +3,7 @@
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         // Register the event handler for the ItemSend event
-        Office.context.mailbox.item.addHandlerAsync(Office.EventType.onMessageSend, onMessageSendHandler);
+        Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         console.log('Add-in is running in background.');
     }
 });
