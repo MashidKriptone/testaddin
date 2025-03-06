@@ -59,11 +59,7 @@ async function onMessageSendHandler(eventArgs) {
             if (isDomainBlocked(toRecipients, blockedDomains) || 
                 isDomainBlocked(ccRecipients, blockedDomains) || 
                 isDomainBlocked(bccRecipients, blockedDomains)) {
-                console.warn("❌ Blocked domain detected. Email is not sent.");
-                Office.context.mailbox.item.notificationMessages.addAsync("error", {
-                    type: "errorMessage",
-                    message: "KntrolEMAIL detected a blocked domain policy and prevented the email from being sent.",
-                });
+                showOutlookNotification("Blocked Domain", "KntrolEMAIL detected a blocked domain policy and prevented the email from being sent.");
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
@@ -82,11 +78,7 @@ async function onMessageSendHandler(eventArgs) {
         if (!validateEmailAddresses(toRecipients) || 
             !validateEmailAddresses(ccRecipients) || 
             !validateEmailAddresses(bccRecipients)) {
-            console.warn("❌ Invalid email addresses found. Email is not sent.");
-            Office.context.mailbox.item.notificationMessages.addAsync("error", {
-                type: "errorMessage",
-                message: "One or more email addresses are invalid.",
-            });
+            showOutlookNotification("Invalid Email", "One or more email addresses are invalid.");
             eventArgs.completed({ allowEvent: false });
             return;
         }
@@ -94,11 +86,7 @@ async function onMessageSendHandler(eventArgs) {
         // **4️⃣ Validate body content**
         for (const pattern in regexPatterns) {
             if (regexPatterns[pattern].test(body)) {
-                console.warn(`❌ Detected sensitive content: ${pattern}. Email not sent.`);
-                Office.context.mailbox.item.notificationMessages.addAsync("error", {
-                    type: "errorMessage",
-                    message: `Your email contains restricted data: ${pattern}.`,
-                });
+                showOutlookNotification("Restricted Content", `Your email contains restricted data: ${pattern}.`);
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
@@ -107,11 +95,7 @@ async function onMessageSendHandler(eventArgs) {
         // **5️⃣ Validate attachments**
         for (const attachment of attachments) {
             if (regexPatterns.attachmentName.test(attachment.name)) {
-                console.warn(`❌ Restricted attachment: ${attachment.name}. Email not sent.`);
-                Office.context.mailbox.item.notificationMessages.addAsync("error", {
-                    type: "errorMessage",
-                    message: `Attachment "${attachment.name}" is restricted.`,
-                });
+                showOutlookNotification("Restricted Attachment", `Attachment "${attachment.name}" is restricted.`);
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
