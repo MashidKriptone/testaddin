@@ -43,32 +43,30 @@ async function onMessageSendHandler(eventArgs) {
         const attachments = await getAttachmentsAsync(item);
 
         console.log("🔹 Email Details:");
-        console.log({ from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
+        console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
         // Fetch policy domains
         const { allowedDomains, blockedDomains } = await fetchPolicyDomains();
 
-        console.log("🔹 Policy Check:");
-        console.log({ allowedDomains, blockedDomains });
+        console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
-        // Allow email if no policies are defined
-        if (allowedDomains.length === 0 && blockedDomains.length === 0) {
-            console.log("✅ No policy restrictions found. Email will be sent.");
-            eventArgs.completed({ allowEvent: true });
-            return;
-        }
-
-        // Check blocked domains
-        if (isDomainBlocked(toRecipients, blockedDomains) || 
-            isDomainBlocked(ccRecipients, blockedDomains) || 
-            isDomainBlocked(bccRecipients, blockedDomains)) {
-            console.warn("❌ Blocked domain detected. Email is not sent.");
-            Office.context.mailbox.item.notificationMessages.addAsync("error", {
-                type: "errorMessage",
-                message: "KntrolEMAIL detected a blocked domain policy and prevented the email from being sent.",
-            });
-            eventArgs.completed({ allowEvent: false });
-            return;
+        // **1️⃣ If no domain restrictions exist, allow email to send**
+        const noDomainRestrictions = allowedDomains.length === 0 && blockedDomains.length === 0;
+        if (noDomainRestrictions) {
+            console.log("✅ No domain restrictions. Proceeding...");
+        } else {
+            // **2️⃣ Check if the email contains blocked domains**
+            if (isDomainBlocked(toRecipients, blockedDomains) || 
+                isDomainBlocked(ccRecipients, blockedDomains) || 
+                isDomainBlocked(bccRecipients, blockedDomains)) {
+                console.warn("❌ Blocked domain detected. Email is not sent.");
+                Office.context.mailbox.item.notificationMessages.addAsync("error", {
+                    type: "errorMessage",
+                    message: "KntrolEMAIL detected a blocked domain policy and prevented the email from being sent.",
+                });
+                eventArgs.completed({ allowEvent: false });
+                return;
+            }
         }
 
         if (!toRecipients && !ccRecipients && !bccRecipients) {
@@ -80,11 +78,10 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        
-        // Validate email addresses
-        if ((toRecipients && !validateEmailAddresses(toRecipients)) ||
-            (ccRecipients && !validateEmailAddresses(ccRecipients)) ||
-            (bccRecipients && !validateEmailAddresses(bccRecipients))) {
+        // **3️⃣ Validate email addresses**
+        if (!validateEmailAddresses(toRecipients) || 
+            !validateEmailAddresses(ccRecipients) || 
+            !validateEmailAddresses(bccRecipients)) {
             console.warn("❌ Invalid email addresses found. Email is not sent.");
             Office.context.mailbox.item.notificationMessages.addAsync("error", {
                 type: "errorMessage",
@@ -94,7 +91,7 @@ async function onMessageSendHandler(eventArgs) {
             return;
         }
 
-        // Validate body content
+        // **4️⃣ Validate body content**
         for (const pattern in regexPatterns) {
             if (regexPatterns[pattern].test(body)) {
                 console.warn(`❌ Detected sensitive content: ${pattern}. Email not sent.`);
@@ -107,6 +104,7 @@ async function onMessageSendHandler(eventArgs) {
             }
         }
 
+        // **5️⃣ Validate attachments**
         for (const attachment of attachments) {
             if (regexPatterns.attachmentName.test(attachment.name)) {
                 console.warn(`❌ Restricted attachment: ${attachment.name}. Email not sent.`);
@@ -120,7 +118,7 @@ async function onMessageSendHandler(eventArgs) {
         }
         console.log("✅ Passed all policy checks. Saving email data...");
 
-        // Save email data to the backend
+        // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         const saveSuccess = await saveEmailData(emailData);
 
