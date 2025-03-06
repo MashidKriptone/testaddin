@@ -122,18 +122,21 @@ async function onMessageSendHandler(eventArgs) {
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         const saveSuccess = await saveEmailData(emailData);
 
-        if (saveSuccess) {
+        if (saveSuccess.success) {
             console.log("✅ Email data saved. Ensuring email is sent.");
             eventArgs.completed({ allowEvent: true });
         } else {
-            console.warn("❌ Email saving failed. Blocking email.");
+            console.warn("❌ Email saving failed:", saveSuccess.message);
+            showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
             eventArgs.completed({ allowEvent: false });
         }
 
     } catch (error) {
         console.error('❌ Error during send event:', error);
+        showOutlookNotification("Error", "An unexpected error occurred while sending the email.");
         eventArgs.completed({ allowEvent: false });
     }
+    
 }
 
 // Fetch policy domains from the backend
@@ -164,7 +167,6 @@ async function fetchPolicyDomains() {
     }
 }
 
-// Save email data to the backend
 async function saveEmailData(emailData) {
     try {
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
@@ -173,17 +175,18 @@ async function saveEmailData(emailData) {
             body: JSON.stringify(emailData),
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to save email: ${response.status} ${response.statusText}`);
-        }
+        const json = await response.json();
 
-        const responseBody = await response.json();
-        console.log("🔹 Server Response:", JSON.stringify(responseBody, null, 2));
-
-        return true;
+        return {
+            success: response.ok && json.success,
+            message: json.message || "Unknown error",
+        };
     } catch (error) {
         console.error("❌ Error saving email data:", error);
-        return false;
+        return {
+            success: false,
+            message: "Unable to connect to the server. Please try again later.",
+        };
     }
 }
 
@@ -262,5 +265,12 @@ function getBodyAsync(item) {
 function getAttachmentsAsync(item) {
     return new Promise((resolve, reject) => {
         item.getAttachmentsAsync(result => result.status === Office.AsyncResultStatus.Succeeded ? resolve(result.value) : reject(result.error));
+    });
+}
+
+function showOutlookNotification(title, message) {
+    Office.context.mailbox.item.notificationMessages.addAsync("error", {
+        type: "errorMessage",
+        message: `${title}: ${message}`,
     });
 }
