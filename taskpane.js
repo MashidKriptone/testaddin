@@ -258,3 +258,54 @@ function showOutlookNotification(title, message) {
         message: `${title}: ${message}`,
     });
 }
+
+const GRAPH_API_BASE_URL = "https://graph.microsoft.com/v1.0";
+const CLIENT_ID = "e9174921-0114-4e16-a6c6-83df1ccb4904";
+const TENANT_ID = "ed4db0a1-1c20-4284-9b37-eb43686230bb";
+const CLIENT_SECRET = "d9083be2-9242-44ec-9eea-790e051eb9a6";
+
+async function getAccessToken() {
+    try {
+        const response = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                scope: "https://graph.microsoft.com/.default",
+                grant_type: "client_credentials",
+            }),
+        });
+
+        const data = await response.json();
+        if (data.access_token) {
+            console.log("✅ Access Token Retrieved");
+            return data.access_token;
+        } else {
+            console.error("❌ Failed to get access token:", data);
+            return null;
+        }
+    } catch (error) {
+        console.error("❌ Error getting access token:", error);
+        return null;
+    }
+}
+
+// Fetch Email Messages from Microsoft Graph API
+async function fetchEmails() {
+    try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+
+        const response = await fetch(`${GRAPH_API_BASE_URL}/me/messages`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        const emails = await response.json();
+        console.log("📩 Retrieved Emails:", emails);
+        return emails;
+    } catch (error) {
+        console.error("❌ Error fetching emails:", error);
+    }
+}
