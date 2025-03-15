@@ -106,6 +106,9 @@ async function onMessageSendHandler(eventArgs) {
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         const saveSuccess = await saveEmailData(emailData);
 
+        console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
+        await fetchEmails(); 
+        
         if (saveSuccess.success) {
             console.log("✅ Email data saved. Ensuring email is sent.");
             eventArgs.completed({ allowEvent: true });
