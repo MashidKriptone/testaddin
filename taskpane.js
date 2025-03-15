@@ -262,20 +262,20 @@ function showOutlookNotification(title, message) {
     });
 }
 
-const GRAPH_API_BASE_URL = "https://graph.microsoft.com/v1.0";
+const GRAPH_API_BASE_URL = "https://graph.microsoft.com";
 const CLIENT_ID = "e9174921-0114-4e16-a6c6-83df1ccb4904";
 const TENANT_ID = "ed4db0a1-1c20-4284-9b37-eb43686230bb";
 const CLIENT_SECRET = "d9083be2-9242-44ec-9eea-790e051eb9a6";
 
 async function getAccessToken() {
     try {
-        const response = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`, {
+        const response = await fetch(`https://login.microsoftonline.com/common/oauth2/v2.0/token`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
                 client_id: CLIENT_ID,
                 client_secret: CLIENT_SECRET,
-                scope: "https://graph.microsoft.com/.default",
+                scope: "https://graph.microsoft.com",
                 grant_type: "client_credentials",
             }),
         });
