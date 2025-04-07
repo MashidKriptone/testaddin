@@ -32,19 +32,11 @@ const regexPatterns = {
 // Event handler for the ItemSend event
 async function onMessageSendHandler(eventArgs) {
     try {
-        // Get token - this will handle auth if needed
-        let token;
-        try {
-            token = await getAccessToken();
-        } catch (authError) {
-            console.error("Authentication failed:", authError);
-            showOutlookNotification("Authentication Error", "Please sign in to continue.");
-            eventArgs.completed({ allowEvent: false });
-            return;
-        }
-
-        // Get user details
-        const userDetails = await getUserDetails(token);
+          // Authenticate and get token
+          const authResponse = await authenticate();
+        
+          // Use the token with Microsoft Graph
+          const userDetails = await getUserDetails(authResponse.access_token);
         console.log("🔹 User Details:", userDetails);
         
         const item = Office.context.mailbox.item;
@@ -296,114 +288,64 @@ function showOutlookNotification(title, message) {
         message: `${title}: ${message}`,
     });
 }
-// Global MSAL variables
-let msalClient;
-let userAccount;
+// MSAL configuration
+const msalConfig = {
+    auth: {
+        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: window.location.origin
+    },
+    cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: false
+    }
+};
 
-// Initialize MSAL client
-async function initializeAuth() {
+// Scopes for Microsoft Graph API
+const tokenRequest = {
+    scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send", "openid", "profile", "email", "offline_access"]
+};
+
+async function authenticate() {
     try {
-        // Check if MSAL is available
-        if (typeof msal === 'undefined') {
-            throw new Error("MSAL library not loaded. Please include msal-browser.js");
-        }
-
-        // MSAL configuration
-        const msalConfig = {
-            auth: {
-                clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // Replace with your Azure AD app client ID
-                authority: "https://login.microsoftonline.com/common",
-                redirectUri: window.location.origin
-            },
-            cache: {
-                cacheLocation: "sessionStorage",
-                storeAuthStateInCookie: false
-            }
-        };
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
         
-        // Initialize MSAL client
-        msalClient = new msal.PublicClientApplication(msalConfig);
+        // Try silent login first
+        const silentResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+        return formatTokenResponse(silentResponse);
         
-        // Handle redirect response
-        const response = await msalClient.handleRedirectPromise();
-        if (response) {
-            userAccount = response.account;
-            console.log("User already signed in:", userAccount);
-            return true;
-        }
+    } catch (silentError) {
+        console.log("Silent token acquisition failed, trying interactive:", silentError);
         
-        // Try silent login
-        const accounts = msalClient.getAllAccounts();
-        if (accounts.length > 0) {
-            userAccount = accounts[0];
-            console.log("Silent login successful:", userAccount);
-            return true;
-        }
-        
-        console.log("User not signed in. Will prompt for login when needed.");
-        return false;
-    } catch (error) {
-        console.error("Authentication initialization error:", error);
-        throw error;
+        // Fallback to interactive login
+        const interactiveResponse = await msalInstance.loginPopup(tokenRequest);
+        const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+        return formatTokenResponse(tokenResponse);
     }
 }
 
-// Get access token for Microsoft Graph
-async function getAccessToken() {
-    try {
-        if (!msalClient) {
-            await initializeAuth();
+function formatTokenResponse(response) {
+    return {
+        "access_token": response.accessToken,
+        "id_token": response.idToken,
+        "expires_in": response.expiresOn.getTime() - Date.now(),
+        "refresh_token": response.refreshToken || "Not provided by MSAL",
+        "token_type": "Bearer",
+        "scope": response.scopes.join(" "),
+        "account": {
+            "username": response.account.username,
+            "name": response.account.name
         }
-
-        const accounts = msalClient.getAllAccounts();
-        if (accounts.length === 0) {
-            // No accounts, need to login
-            return await login();
-        }
-
-        userAccount = accounts[0];
-        const tokenRequest = {
-            scopes: ["User.Read", "Mail.Read", "Mail.Send"],
-            account: userAccount
-        };
-        
-        try {
-            const response = await msalClient.acquireTokenSilent(tokenRequest);
-            return response.accessToken;
-        } catch (silentError) {
-            console.log("Silent token acquisition failed, trying interactive:", silentError);
-            return await login();
-        }
-    } catch (error) {
-        console.error("Error in getAccessToken:", error);
-        throw error;
-    }
+    };
 }
 
-// Perform interactive login
-async function login() {
-    try {
-        const loginRequest = {
-            scopes: ["User.Read", "Mail.Read", "Mail.Send"],
-            prompt: "select_account"
-        };
-        
-        const response = await msalClient.loginPopup(loginRequest);
-        userAccount = response.account;
-        
-        // Now get the token
-        const tokenRequest = {
-            scopes: ["User.Read", "Mail.Read", "Mail.Send"],
-            account: userAccount
-        };
-        
-        const tokenResponse = await msalClient.acquireTokenSilent(tokenRequest);
-        return tokenResponse.accessToken;
-    } catch (error) {
-        console.error("Login failed:", error);
-        throw error;
-    }
-}
+// Usage example
+authenticate().then(response => {
+    console.log("Authentication response:", response);
+    // This will give you a similar structure to your Google response
+}).catch(error => {
+    console.error("Authentication error:", error);
+});
 
 async function fetchEmails() {
     try {
