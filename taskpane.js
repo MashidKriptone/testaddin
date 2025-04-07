@@ -4,7 +4,11 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         // Register the event handler for the ItemSend event
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-        console.log('Add-in is running in the background.');
+        initializeAuth().then(() => {
+            console.log('Add-in is running with authentication ready.');
+        }).catch(error => {
+            console.error('Authentication initialization failed:', error);
+        });
     }
 });
 
@@ -31,6 +35,11 @@ const regexPatterns = {
 // Event handler for the ItemSend event
 async function onMessageSendHandler(eventArgs) {
     try {
+        // Get user details from Microsoft Graph
+        const token = await getAccessToken();
+        const userDetails = await getUserDetails(token);
+        
+        console.log("🔹 User Details:", userDetails);
         const item = Office.context.mailbox.item;
 
         // Retrieve email details
@@ -45,7 +54,7 @@ async function onMessageSendHandler(eventArgs) {
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
         // Fetch policy domains
-        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments } = await fetchPolicy();
+        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments } = await fetchPolicyDomains();
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
@@ -125,6 +134,25 @@ async function onMessageSendHandler(eventArgs) {
         eventArgs.completed({ allowEvent: false });
     }
     
+}
+// Get user details from Microsoft Graph
+async function getUserDetails(accessToken) {
+    try {
+        const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Graph API request failed with status ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching user details:", error);
+        throw error;
+    }
 }
 
 // Fetch policy domains from the backend
@@ -260,4 +288,106 @@ function showOutlookNotification(title, message) {
         type: "errorMessage",
         message: `${title}: ${message}`,
     });
+}
+// Authentication variables
+let msalClient;
+let userAccount;
+
+// Initialize MSAL client
+async function initializeAuth() {
+    try {
+        // MSAL configuration
+        const msalConfig = {
+            auth: {
+                clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // Register your app in Azure AD
+                authority: "https://login.microsoftonline.com/common",
+                redirectUri: window.location.origin
+            },
+            cache: {
+                cacheLocation: "sessionStorage",
+                storeAuthStateInCookie: false
+            }
+        };
+        
+        // Initialize MSAL client
+        msalClient = new msal.PublicClientApplication(msalConfig);
+        
+        // Check if user is already signed in
+        const response = await msalClient.handleRedirectPromise();
+        if (response) {
+            userAccount = response.account;
+            console.log("User already signed in:", userAccount);
+            return;
+        }
+        
+        // Try silent login
+        const accounts = msalClient.getAllAccounts();
+        if (accounts.length > 0) {
+            userAccount = accounts[0];
+            console.log("Silent login successful:", userAccount);
+            return;
+        }
+        
+        // If not signed in, show login button or redirect
+        console.log("User not signed in. Will prompt for login when needed.");
+    } catch (error) {
+        console.error("Authentication initialization error:", error);
+        throw error;
+    }
+}
+
+// Get access token for Microsoft Graph
+async function getAccessToken() {
+    try {
+        if (!userAccount) {
+            const accounts = msalClient.getAllAccounts();
+            if (accounts.length === 0) {
+                throw new Error("No user account available");
+            }
+            userAccount = accounts[0];
+        }
+        
+        const tokenRequest = {
+            scopes: ["User.Read", "Mail.Read", "Mail.Send"],
+            account: userAccount
+        };
+        
+        const response = await msalClient.acquireTokenSilent(tokenRequest);
+        return response.accessToken;
+    } catch (silentError) {
+        console.log("Silent token acquisition failed, trying interactive:", silentError);
+        
+        try {
+            const response = await msalClient.acquireTokenPopup({
+                scopes: ["User.Read", "Mail.Read", "Mail.Send"]
+            });
+            userAccount = response.account;
+            return response.accessToken;
+        } catch (interactiveError) {
+            console.error("Interactive token acquisition failed:", interactiveError);
+            throw interactiveError;
+        }
+    }
+}
+
+async function fetchEmails() {
+    try {
+        const token = await getAccessToken();
+        const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch emails: ${response.statusText}`);
+        }
+        
+        const emails = await response.json();
+        console.log("🔹 Recent emails:", emails);
+        return emails;
+    } catch (error) {
+        console.error("Error fetching emails:", error);
+        throw error;
+    }
 }
