@@ -47,7 +47,7 @@ async function onMessageSendHandler(eventArgs) {
         const attachments = await getAttachmentsAsync(item);
 
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
-        const token = getAccessToken();
+        const token =  await getAccessToken();
         console.log("access token ------------",token)
 
         // Fetch policy domains
