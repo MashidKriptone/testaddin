@@ -47,6 +47,8 @@ async function onMessageSendHandler(eventArgs) {
         const attachments = await getAttachmentsAsync(item);
 
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
+        const token = getAccessToken();
+        console.log("access token ------------",token)
 
         // Fetch policy domains
         const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments } = await fetchPolicyDomains();
@@ -346,6 +348,27 @@ function formatTokenResponse(response) {
     };
 }
 
+async function getAccessToken() {
+    const accounts = msalInstance.getAllAccounts();
+
+    if (accounts.length === 0) {
+        throw new Error("No signed-in account found");
+    }
+
+    const silentRequest = {
+        scopes: ["User.Read", "Mail.Send"],
+        account: accounts[0]
+    };
+
+    try {
+        const response = await msalInstance.acquireTokenSilent(silentRequest);
+        return response.accessToken;
+    } catch (error) {
+        console.warn("Silent token acquisition failed, falling back to popup.", error);
+        const response = await msalInstance.acquireTokenPopup(silentRequest);
+        return response.accessToken;
+    }
+}
 
 async function fetchEmails() {
     try {
