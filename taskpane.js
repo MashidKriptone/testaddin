@@ -3,7 +3,24 @@
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
-
+        (async () => {
+            try {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length === 0) {
+                    // No account signed in, do interactive login (popup)
+                    const loginResponse = await msalInstance.loginPopup({
+                        scopes: ["User.Read", "Mail.Send"]
+                    });
+                    currentAccount = loginResponse.account;
+                    console.log("🔐 Signed in automatically:", currentAccount.username);
+                } else {
+                    currentAccount = accounts[0];
+                    console.log("🔐 Already signed in:", currentAccount.username);
+                }
+            } catch (error) {
+                console.error("⚠️ Auto-login failed:", error);
+            }
+        })();
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
          
         console.log('Add-in is running in the background.');
@@ -288,22 +305,37 @@ function showOutlookNotification(title, message) {
 }
 let msalInstance;
 let currentAccount = null;
+let isLoginAttempted = false;
 
 function initializeMSAL() {
     const msalConfig = {
         auth: {
-            clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // 🔁 Replace with your real Client ID
+            clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
             authority: "https://login.microsoftonline.com/common",
-            redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html" // 🔁 Update this to match your Azure registration
+            redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html"
         }
     };
 
     msalInstance = new msal.PublicClientApplication(msalConfig);
 
-    const loginRequest = {
-        scopes: ["User.Read", "Mail.Send"]
-    };
-
+    if (!isLoginAttempted) {
+        isLoginAttempted = true;
+        (async () => {
+            try {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length === 0) {
+                    const loginResponse = await msalInstance.loginPopup({
+                        scopes: ["User.Read", "Mail.Send"]
+                    });
+                    currentAccount = loginResponse.account;
+                } else {
+                    currentAccount = accounts[0];
+                }
+            } catch (error) {
+                console.error("Auto-login error:", error);
+            }
+        })();
+    }
     document.getElementById("signInButton").addEventListener("click", async () => {
         try {
             const loginResponse = await msalInstance.loginPopup(loginRequest);
