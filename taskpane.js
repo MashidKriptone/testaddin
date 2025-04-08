@@ -4,29 +4,6 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
 
-        // Attempt to log in immediately if no user is signed in
-        msalInstance.handleRedirectPromise().then(response => {
-            if (response) {
-                msalInstance.setActiveAccount(response.account);
-            } else {
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length > 0) {
-                    msalInstance.setActiveAccount(accounts[0]);
-                } else {
-                    // No user signed in yet, trigger login
-                    msalInstance.loginPopup({
-                        scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send"]
-                    }).then(loginResponse => {
-                        msalInstance.setActiveAccount(loginResponse.account);
-                    }).catch(error => {
-                        console.error("Login popup failed:", error);
-                        showOutlookNotification("Login Failed", "Please sign in before sending emails.");
-                    });
-                }
-            }
-        }).catch(error => {
-            console.error("MSAL redirect handling error:", error);
-        });
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
          
         console.log('Add-in is running in the background.');
@@ -318,54 +295,53 @@ function showOutlookNotification(title, message) {
         message: `${title}: ${message}`,
     });
 }
-// Global MSAL instance
-// Import MSAL browser classes
-const msalConfig = {
-    auth: {
-        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // Replace with your Azure AD app's client ID
-        authority: "https://login.microsoftonline.com/common", // Or use your tenant ID
-        redirectUri: "https://login.microsoftonline.com/common/oauth2/nativeclient", // Update this to match your environment
-    }
-};
+let msalInstance;
+let currentAccount = null;
 
-// Create an instance of PublicClientApplication
-const msalInstance = new msal.PublicClientApplication(msalConfig);
-
-// Define login request
-const loginRequest = {
-    scopes: ["User.Read", "Mail.Send"] // Add other scopes as needed
-};
-
-// Handle sign-in on button click
-document.getElementById("signInButton").addEventListener("click", async () => {
-    try {
-        const loginResponse = await msalInstance.loginPopup(loginRequest);
-        console.log("Logged in successfully:", loginResponse);
-
-        // Store account info
-        msalInstance.setActiveAccount(loginResponse.account);
-
-        // Optionally get token silently
-        const tokenResponse = await msalInstance.acquireTokenSilent(loginRequest);
-        console.log("Access Token:", tokenResponse.accessToken);
-        
-        // Now you can use this token to call Microsoft Graph or send emails
-
-    } catch (error) {
-        console.error("Login error:", error);
-
-        // If silent token acquisition fails, fallback to interactive
-        if (error instanceof msal.InteractionRequiredAuthError) {
-            try {
-                const tokenResponse = await msalInstance.acquireTokenPopup(loginRequest);
-                console.log("Token acquired via popup:", tokenResponse.accessToken);
-            } catch (popupError) {
-                console.error("Token acquisition via popup failed:", popupError);
-            }
+function initializeMSAL() {
+    const msalConfig = {
+        auth: {
+            clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // 🔁 Replace with your real Client ID
+            authority: "https://login.microsoftonline.com/common",
+            redirectUri: "https://outlook.live.com/" // 🔁 Update this to match your Azure registration
         }
-    }
-});
+    };
 
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+
+    const loginRequest = {
+        scopes: ["User.Read", "Mail.Send"]
+    };
+
+    document.getElementById("signInButton").addEventListener("click", async () => {
+        try {
+            const loginResponse = await msalInstance.loginPopup(loginRequest);
+            console.log("Login successful:", loginResponse);
+            currentAccount = loginResponse.account;
+            updateUI(true);
+        } catch (error) {
+            console.error("Login error:", error);
+        }
+    });
+
+    document.getElementById("signOutButton").addEventListener("click", async () => {
+        try {
+            const logoutRequest = {
+                account: currentAccount
+            };
+            await msalInstance.logoutPopup(logoutRequest);
+            console.log("Logout successful");
+            updateUI(false);
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
+    });
+}
+
+function updateUI(isSignedIn) {
+    document.getElementById("signInButton").style.display = isSignedIn ? "none" : "inline-block";
+    document.getElementById("signOutButton").style.display = isSignedIn ? "inline-block" : "none";
+}
 
 function formatTokenResponse(response) {
     return {
