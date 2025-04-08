@@ -319,87 +319,53 @@ function showOutlookNotification(title, message) {
     });
 }
 // Global MSAL instance
-let msalInstance;
-
-// Initialize MSAL
-function initializeMSAL() {
-    const msalConfig = {
-        auth: {
-            clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // Replace with your actual client ID
-            authority: "https://login.microsoftonline.com/common",
-            redirectUri: window.location.origin
-        },
-        cache: {
-            cacheLocation: "sessionStorage",
-            storeAuthStateInCookie: false
-        }
-    };
-    
-    msalInstance = new msal.PublicClientApplication(msalConfig);
-    
-    // Handle redirect response if any
-    msalInstance.handleRedirectPromise()
-        .then(handleResponse)
-        .catch(error => {
-            console.error("Redirect response handling failed:", error);
-        });
-}
-
-async function authenticate() {
-    try {
-        // Initialize MSAL if not already done
-        if (!msalInstance) {
-            initializeMSAL();
-        }
-
-        // Get active account
-        const account = msalInstance.getActiveAccount();
-        if (!account) {
-            throw new Error("No active account found");
-        }
-
-        // Try silent token acquisition first
-        const silentRequest = {
-            scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send"],
-            account: account
-        };
-
-        try {
-            const silentResponse = await msalInstance.acquireTokenSilent(silentRequest);
-            return formatTokenResponse(silentResponse);
-        } catch (silentError) {
-            console.log("Silent token acquisition failed, trying interactive:", silentError);
-            return await getTokenInteractive();
-        }
-    } catch (error) {
-        console.error("Authentication failed:", error);
-        throw error;
+// Import MSAL browser classes
+const msalConfig = {
+    auth: {
+        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // Replace with your Azure AD app's client ID
+        authority: "https://login.microsoftonline.com/common", // Or use your tenant ID
+        redirectUri: "https://login.microsoftonline.com/common/oauth2/nativeclient", // Update this to match your environment
     }
-}
+};
 
-async function getTokenInteractive() {
+// Create an instance of PublicClientApplication
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+// Define login request
+const loginRequest = {
+    scopes: ["User.Read", "Mail.Send"] // Add other scopes as needed
+};
+
+// Handle sign-in on button click
+document.getElementById("signInButton").addEventListener("click", async () => {
     try {
-        // First login with popup
-        const loginResponse = await msalInstance.loginPopup({
-            scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send"]
-        });
-        
-        // Set the active account
+        const loginResponse = await msalInstance.loginPopup(loginRequest);
+        console.log("Logged in successfully:", loginResponse);
+
+        // Store account info
         msalInstance.setActiveAccount(loginResponse.account);
+
+        // Optionally get token silently
+        const tokenResponse = await msalInstance.acquireTokenSilent(loginRequest);
+        console.log("Access Token:", tokenResponse.accessToken);
         
-        // Now get the token silently
-        const silentRequest = {
-            scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send"],
-            account: loginResponse.account
-        };
-        
-        const tokenResponse = await msalInstance.acquireTokenSilent(silentRequest);
-        return formatTokenResponse(tokenResponse);
+        // Now you can use this token to call Microsoft Graph or send emails
+
     } catch (error) {
-        console.error("Interactive authentication failed:", error);
-        throw error;
+        console.error("Login error:", error);
+
+        // If silent token acquisition fails, fallback to interactive
+        if (error instanceof msal.InteractionRequiredAuthError) {
+            try {
+                const tokenResponse = await msalInstance.acquireTokenPopup(loginRequest);
+                console.log("Token acquired via popup:", tokenResponse.accessToken);
+            } catch (popupError) {
+                console.error("Token acquisition via popup failed:", popupError);
+            }
+        }
     }
-}
+});
+
 
 function formatTokenResponse(response) {
     return {
