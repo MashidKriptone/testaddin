@@ -35,17 +35,6 @@ async function onMessageSendHandler(eventArgs) {
     try {
        
         // Authenticate and get token
-        let authResponse;
-        try {
-            authResponse = await authenticate();
-            console.log("Auth successful:", authResponse);
-        } catch (authError) {
-            console.error("Authentication failed:", authError);
-            showOutlookNotification("Authentication Required", "Please sign in to continue.");
-            eventArgs.completed({ allowEvent: false });
-            return;
-        }
-        
         const item = Office.context.mailbox.item;
 
         // Retrieve email details
