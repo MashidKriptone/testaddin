@@ -2,7 +2,31 @@
 
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
-        // Register the event handler for the ItemSend event
+        initializeMSAL();
+
+        // Attempt to log in immediately if no user is signed in
+        msalInstance.handleRedirectPromise().then(response => {
+            if (response) {
+                msalInstance.setActiveAccount(response.account);
+            } else {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    msalInstance.setActiveAccount(accounts[0]);
+                } else {
+                    // No user signed in yet, trigger login
+                    msalInstance.loginPopup({
+                        scopes: ["User.Read", "Mail.ReadWrite", "Mail.Send"]
+                    }).then(loginResponse => {
+                        msalInstance.setActiveAccount(loginResponse.account);
+                    }).catch(error => {
+                        console.error("Login popup failed:", error);
+                        showOutlookNotification("Login Failed", "Please sign in before sending emails.");
+                    });
+                }
+            }
+        }).catch(error => {
+            console.error("MSAL redirect handling error:", error);
+        });
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
          
         console.log('Add-in is running in the background.');
@@ -32,11 +56,7 @@ const regexPatterns = {
 // Event handler for the ItemSend event
 async function onMessageSendHandler(eventArgs) {
     try {
-           // Initialize MSAL if not done
-        if (!msalInstance) {
-            initializeMSAL();
-        }
-
+       
         // Authenticate and get token
         let authResponse;
         try {
@@ -325,18 +345,6 @@ function initializeMSAL() {
         });
 }
 
-function handleResponse(response) {
-    if (response !== null) {
-        // User just signed in
-        msalInstance.setActiveAccount(response.account);
-    } else {
-        // Check for active account
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            msalInstance.setActiveAccount(accounts[0]);
-        }
-    }
-}
 async function authenticate() {
     try {
         // Initialize MSAL if not already done
