@@ -3,24 +3,6 @@
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
-
-    const accounts = msalInstance.getAllAccounts();
-
-    if (accounts.length === 0 && !sessionStorage.getItem("msal.interaction.status")) {
-      msalInstance.loginPopup(loginRequest)
-        .then(response => {
-          console.log("🔐 Auto-login success:", response);
-          currentAccount = response.account;
-          updateUI(true);
-        })
-        .catch(error => {
-          console.error("❌ Auto-login failed:", error);
-        });
-    } else {
-      currentAccount = accounts[0];
-      updateUI(true);
-    }
-
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
          
         console.log('Add-in is running in the background.');
@@ -50,7 +32,21 @@ const regexPatterns = {
 // Event handler for the ItemSend event
 async function onMessageSendHandler(eventArgs) {
     try {
-       
+       if (!isInitialized) {
+            initializeMSAL();
+        }
+
+        // Get token first
+        let token;
+        try {
+            token = await getAccessToken();
+            console.log("Access token:", token);
+        } catch (authError) {
+            console.error("Authentication failed:", authError);
+            showOutlookNotification("Authentication Required", "Please sign in to continue.");
+            eventArgs.completed({ allowEvent: false });
+            return;
+        }
         // Authenticate and get token
         const item = Office.context.mailbox.item;
 
@@ -64,8 +60,6 @@ async function onMessageSendHandler(eventArgs) {
         const attachments = await getAttachmentsAsync(item);
 
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
-        const token =  await getAccessToken();
-        console.log("access token ------------",token)
 
         // Fetch policy domains
         const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments } = await fetchPolicyDomains();
@@ -303,65 +297,107 @@ function showOutlookNotification(title, message) {
         message: `${title}: ${message}`,
     });
 }
-let msalInstance;
-let currentAccount = null;
-let isLoginAttempted = false;
-
-function initializeMSAL() {
-    const msalConfig = {
-        auth: {
-            clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
-            authority: "https://login.microsoftonline.com/common",
-            redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html"
-        }
-    };
-
-    msalInstance = new msal.PublicClientApplication(msalConfig);
-
-    if (!isLoginAttempted) {
-        isLoginAttempted = true;
-        (async () => {
-            try {
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length === 0) {
-                    const loginResponse = await msalInstance.loginPopup({
-                        scopes: ["User.Read", "Mail.Send"]
-                    });
-                    currentAccount = loginResponse.account;
-                } else {
-                    currentAccount = accounts[0];
-                }
-            } catch (error) {
-                console.error("Auto-login error:", error);
-            }
-        })();
+// MSAL Configuration
+const msalConfig = {
+    auth: {
+        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html"
+    },
+    cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: true
     }
-    const loginRequest = {
-        scopes: ["User.Read", "Mail.Send"]
-    };
-    document.getElementById("signInButton").addEventListener("click", async () => {
-        try {
-            const loginResponse = await msalInstance.loginPopup(loginRequest);
-            console.log("Login successful:", loginResponse);
-            currentAccount = loginResponse.account;
-            updateUI(true);
-        } catch (error) {
-            console.error("Login error:", error);
-        }
-    });
+};
 
-    document.getElementById("signOutButton").addEventListener("click", async () => {
-        try {
-            const logoutRequest = {
-                account: currentAccount
-            };
-            await msalInstance.logoutPopup(logoutRequest);
-            console.log("Logout successful");
-            updateUI(false);
-        } catch (error) {
-            console.error("Logout error:", error);
+// MSAL instance and state
+let msalInstance;
+let isInitialized = false;
+let authInProgress = false;
+
+// Initialize MSAL
+function initializeMSAL() {
+    if (isInitialized) return;
+    
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    isInitialized = true;
+    
+    // Handle redirect response if any
+    msalInstance.handleRedirectPromise()
+        .then(handleAuthResponse)
+        .catch(error => {
+            console.error("Redirect handling error:", error);
+        });
+}
+
+// Handle authentication response
+function handleAuthResponse(response) {
+    if (response) {
+        console.log("Authentication successful:", response);
+        return response;
+    }
+    return null;
+}
+
+// Get access token with proper error handling
+async function getAccessToken() {
+    if (!isInitialized) {
+        initializeMSAL();
+    }
+
+    try {
+        // Check for existing accounts
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length === 0) {
+            return await loginAndGetToken();
         }
-    });
+
+        // Try silent token acquisition
+        const silentRequest = {
+            scopes: ["User.Read", "Mail.Send"],
+            account: accounts[0]
+        };
+
+        try {
+            const response = await msalInstance.acquireTokenSilent(silentRequest);
+            return response.accessToken;
+        } catch (silentError) {
+            console.log("Silent token failed, trying popup:", silentError);
+            return await loginAndGetToken();
+        }
+    } catch (error) {
+        console.error("Error in getAccessToken:", error);
+        throw error;
+    }
+}
+
+// Perform interactive login
+async function loginAndGetToken() {
+    if (authInProgress) {
+        throw new Error("Authentication already in progress");
+    }
+
+    authInProgress = true;
+    try {
+        const loginRequest = {
+            scopes: ["User.Read", "Mail.Send"],
+            prompt: "select_account"
+        };
+
+        // First login
+        const loginResponse = await msalInstance.loginPopup(loginRequest);
+        
+        // Then get token
+        const tokenRequest = {
+            scopes: ["User.Read", "Mail.Send"],
+            account: loginResponse.account
+        };
+        
+        const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+        return tokenResponse.accessToken;
+    } finally {
+        authInProgress = false;
+    }
 }
 
 function updateUI(isSignedIn) {
@@ -383,53 +419,24 @@ function formatTokenResponse(response) {
     };
 }
 
-async function getAccessToken() {
-    let accounts = msalInstance.getAllAccounts();
-
-    if (accounts.length === 0) {
-        console.warn("No account found. Signing in...");
-
-        // Do an interactive login
-        const loginResponse = await msalInstance.loginPopup({
-            scopes: ["User.Read", "Mail.Send"]
-        });
-
-        accounts = msalInstance.getAllAccounts(); // update after login
-    }
-
-    const silentRequest = {
-        scopes: ["User.Read", "Mail.Send"],
-        account: accounts[0]
-    };
-
-    try {
-        const response = await msalInstance.acquireTokenSilent(silentRequest);
-        return response.accessToken;
-    } catch (error) {
-        console.warn("Silent token failed. Trying popup...", error);
-        const response = await msalInstance.acquireTokenPopup(silentRequest);
-        return response.accessToken;
-    }
-}
-
-async function fetchEmails() {
-    try {
-        const token = await getAccessToken();
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+// async function fetchEmails() {
+//     try {
+//         const token = await getAccessToken();
+//         const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
+//             headers: {
+//                 'Authorization': `Bearer ${token}`
+//             }
+//         });
         
-        if (!response.ok) {
-            throw new Error(`Failed to fetch emails: ${response.statusText}`);
-        }
+//         if (!response.ok) {
+//             throw new Error(`Failed to fetch emails: ${response.statusText}`);
+//         }
         
-        const emails = await response.json();
-        console.log("🔹 Recent emails:", emails);
-        return emails;
-    } catch (error) {
-        console.error("Error fetching emails:", error);
-        throw error;
-    }
-}
+//         const emails = await response.json();
+//         console.log("🔹 Recent emails:", emails);
+//         return emails;
+//     } catch (error) {
+//         console.error("Error fetching emails:", error);
+//         throw error;
+//     }
+// }
