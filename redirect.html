@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Redirect</title>
+    <script>
+      // Needed for MSAL redirect flow
+      if (window.opener && window.opener.msalInstance) {
+        window.opener.msalInstance.handleRedirectPromise();
+      }
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>

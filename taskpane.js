@@ -294,7 +294,7 @@ function initializeMSAL() {
         auth: {
             clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144", // 🔁 Replace with your real Client ID
             authority: "https://login.microsoftonline.com/common",
-            redirectUri: "https://login.microsoftonline.com/common/oauth2/nativeclient" // 🔁 Update this to match your Azure registration
+            redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html" // 🔁 Update this to match your Azure registration
         }
     };
 
