@@ -3,24 +3,24 @@
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
-        (async () => {
-            try {
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length === 0) {
-                    // No account signed in, do interactive login (popup)
-                    const loginResponse = await msalInstance.loginPopup({
-                        scopes: ["User.Read", "Mail.Send"]
-                    });
-                    currentAccount = loginResponse.account;
-                    console.log("🔐 Signed in automatically:", currentAccount.username);
-                } else {
-                    currentAccount = accounts[0];
-                    console.log("🔐 Already signed in:", currentAccount.username);
-                }
-            } catch (error) {
-                console.error("⚠️ Auto-login failed:", error);
-            }
-        })();
+
+    const accounts = msalInstance.getAllAccounts();
+
+    if (accounts.length === 0 && !sessionStorage.getItem("msal.interaction.status")) {
+      msalInstance.loginPopup(loginRequest)
+        .then(response => {
+          console.log("🔐 Auto-login success:", response);
+          currentAccount = response.account;
+          updateUI(true);
+        })
+        .catch(error => {
+          console.error("❌ Auto-login failed:", error);
+        });
+    } else {
+      currentAccount = accounts[0];
+      updateUI(true);
+    }
+
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
          
         console.log('Add-in is running in the background.');
@@ -336,6 +336,9 @@ function initializeMSAL() {
             }
         })();
     }
+    const loginRequest = {
+        scopes: ["User.Read", "Mail.Send"]
+    };
     document.getElementById("signInButton").addEventListener("click", async () => {
         try {
             const loginResponse = await msalInstance.loginPopup(loginRequest);
