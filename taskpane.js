@@ -331,6 +331,12 @@ function initializeMSAL() {
         .catch(error => {
             console.error("Redirect handling error:", error);
         });
+        // Set up button event listeners
+    document.getElementById("signInButton").addEventListener("click", signIn);
+    document.getElementById("signOutButton").addEventListener("click", signOut);
+    
+    // Update UI based on current auth state
+    updateUI();
 }
 
 // Handle authentication response
@@ -403,24 +409,69 @@ async function loginAndGetToken() {
     }
 }
 
-function updateUI(isSignedIn) {
-    document.getElementById("signInButton").style.display = isSignedIn ? "none" : "inline-block";
-    document.getElementById("signOutButton").style.display = isSignedIn ? "inline-block" : "none";
+// Sign in function
+async function signIn() {
+    try {
+        const loginRequest = {
+            scopes: ["User.Read", "Mail.Send"],
+            prompt: "select_account"
+        };
+        
+        const loginResponse = await msalInstance.loginPopup(loginRequest);
+        console.log("Login successful:", loginResponse);
+        updateUI();
+    } catch (error) {
+        console.error("Login error:", error);
+        showOutlookNotification("Login Failed", "Please try signing in again.");
+    }
 }
 
-function formatTokenResponse(response) {
-    return {
-        access_token: response.accessToken,
-        id_token: response.idToken,
-        expires_in: Math.floor((response.expiresOn.getTime() - Date.now()) / 1000),
-        token_type: "Bearer",
-        scope: response.scopes.join(" "),
-        account: {
-            username: response.account.username,
-            name: response.account.name
+// Sign out function
+async function signOut() {
+    try {
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const logoutRequest = {
+                account: accounts[0],
+                postLogoutRedirectUri: window.location.origin
+            };
+            await msalInstance.logoutPopup(logoutRequest);
         }
-    };
+        console.log("Logout successful");
+        updateUI();
+    } catch (error) {
+        console.error("Logout error:", error);
+        showOutlookNotification("Logout Failed", "Please try signing out again.");
+    }
 }
+
+function updateUI() {
+    const accounts = msalInstance?.getAllAccounts() || [];
+    const isSignedIn = accounts.length > 0;
+    
+    document.getElementById("signInButton").style.display = isSignedIn ? "none" : "block";
+    document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
+    
+    if (isSignedIn) {
+        console.log("User is signed in as:", accounts[0].username);
+    } else {
+        console.log("User is signed out");
+    }
+}
+
+// function formatTokenResponse(response) {
+//     return {
+//         access_token: response.accessToken,
+//         id_token: response.idToken,
+//         expires_in: Math.floor((response.expiresOn.getTime() - Date.now()) / 1000),
+//         token_type: "Bearer",
+//         scope: response.scopes.join(" "),
+//         account: {
+//             username: response.account.username,
+//             name: response.account.name
+//         }
+//     };
+// }
 
 async function fetchEmails() {
     try {
