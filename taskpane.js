@@ -125,7 +125,8 @@ async function onMessageSendHandler(eventArgs) {
         const saveSuccess = await saveEmailData(emailData);
 
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
-        await fetchEmails(); 
+        const oldEmail = await fetchEmails(); 
+        console.log("Previous Emails ",oldEmail);
         
         if (saveSuccess.success) {
             console.log("✅ Email data saved. Ensuring email is sent.");
@@ -166,9 +167,10 @@ async function getUserDetails(accessToken) {
 // Fetch policy domains from the backend
 async function fetchPolicyDomains() {
     try {
+        const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}` },
         });
 
         if (!response.ok) throw new Error('Failed to fetch policy data: ' + response.statusText);
@@ -192,9 +194,10 @@ async function fetchPolicyDomains() {
 
 async function saveEmailData(emailData) {
     try {
+        const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}` },
             body: JSON.stringify(emailData),
         });
 
@@ -419,24 +422,24 @@ function formatTokenResponse(response) {
     };
 }
 
-// async function fetchEmails() {
-//     try {
-//         const token = await getAccessToken();
-//         const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
-//             headers: {
-//                 'Authorization': `Bearer ${token}`
-//             }
-//         });
+async function fetchEmails() {
+    try {
+        const token = await getAccessToken();
+        const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
         
-//         if (!response.ok) {
-//             throw new Error(`Failed to fetch emails: ${response.statusText}`);
-//         }
+        if (!response.ok) {
+            throw new Error(`Failed to fetch emails: ${response.statusText}`);
+        }
         
-//         const emails = await response.json();
-//         console.log("🔹 Recent emails:", emails);
-//         return emails;
-//     } catch (error) {
-//         console.error("Error fetching emails:", error);
-//         throw error;
-//     }
-// }
+        const emails = await response.json();
+        console.log("🔹 Recent emails:", emails);
+        return emails;
+    } catch (error) {
+        console.error("Error fetching emails:", error);
+        throw error;
+    }
+}
