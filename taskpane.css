@@ -78,8 +78,8 @@ button:hover {
     color: #fabf48;
 }
 #signInButton {
-    background-color: #0078d4;
-    color: white;
+    background-color: #1b326a;
+    color: #fabf48;
     padding: 10px 16px;
     border: none;
     border-radius: 6px;
@@ -89,5 +89,5 @@ button:hover {
 }
 
 #signInButton:hover {
-    background-color: #005a9e;
+    background-color: #162d69;
 }
