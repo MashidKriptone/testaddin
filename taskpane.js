@@ -349,10 +349,17 @@ function formatTokenResponse(response) {
 }
 
 async function getAccessToken() {
-    const accounts = msalInstance.getAllAccounts();
+    let accounts = msalInstance.getAllAccounts();
 
     if (accounts.length === 0) {
-        throw new Error("No signed-in account found");
+        console.warn("No account found. Signing in...");
+
+        // Do an interactive login
+        const loginResponse = await msalInstance.loginPopup({
+            scopes: ["User.Read", "Mail.Send"]
+        });
+
+        accounts = msalInstance.getAllAccounts(); // update after login
     }
 
     const silentRequest = {
@@ -364,7 +371,7 @@ async function getAccessToken() {
         const response = await msalInstance.acquireTokenSilent(silentRequest);
         return response.accessToken;
     } catch (error) {
-        console.warn("Silent token acquisition failed, falling back to popup.", error);
+        console.warn("Silent token failed. Trying popup...", error);
         const response = await msalInstance.acquireTokenPopup(silentRequest);
         return response.accessToken;
     }
