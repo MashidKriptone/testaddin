@@ -170,7 +170,7 @@ async function fetchPolicyDomains() {
         const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
         });
 
         if (!response.ok) throw new Error('Failed to fetch policy data: ' + response.statusText);
@@ -197,7 +197,7 @@ async function saveEmailData(emailData) {
         const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
             body: JSON.stringify(emailData),
         });
 
