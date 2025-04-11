@@ -66,7 +66,6 @@ async function onMessageSendHandler(eventArgs) {
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
-        interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments);
 
             // **1️⃣ If no domain restrictions exist, allow email to send**
         const noDomainRestrictions = allowedDomains.length === 0 && blockedDomains.length === 0;
@@ -124,20 +123,27 @@ async function onMessageSendHandler(eventArgs) {
 
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
-        // const saveSuccess = await saveEmailData(emailData);
+        if (encryptOutgoingEmails || encryptOutgoingAttachments) {
+
+            interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments);
+        }else{
+
+            const saveSuccess = await saveEmailData(emailData);
+            if (saveSuccess.success) {
+                console.log("✅ Email data saved. Ensuring email is sent.");
+                eventArgs.completed({ allowEvent: true });
+            } else {
+                console.warn("❌ Email saving failed:", saveSuccess.message);
+                showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
+                eventArgs.completed({ allowEvent: false });
+            }
+        }
         
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
         const oldEmail = await fetchEmails(); 
         console.log("Previous Emails ",oldEmail);
         
-        if (saveSuccess.success) {
-            console.log("✅ Email data saved. Ensuring email is sent.");
-            eventArgs.completed({ allowEvent: true });
-        } else {
-            console.warn("❌ Email saving failed:", saveSuccess.message);
-            showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
-            eventArgs.completed({ allowEvent: false });
-        }
+       
 
     } catch (error) {
         console.error('❌ Error during send event:', error);
@@ -266,29 +272,29 @@ async function getEncryptedEmail(emailDataDto) {
                     }
                 });
             }          
-// async function saveEmailData(emailData) {
-//     try {
-//         const token = await getAccessToken();
-//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
-//             body: JSON.stringify(emailData),
-//         });
+async function saveEmailData(emailData) {
+    try {
+        const token = await getAccessToken();
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+            body: JSON.stringify(emailData),
+        });
 
-//         const json = await response.json();
+        const json = await response.json();
 
-//         return {
-//             success: response.ok && json.success,
-//             message: json.message || "Unknown error",
-//         };
-//     } catch (error) {
-//         console.error("❌ Error saving email data:", error);
-//         return {
-//             success: false,
-//             message: "Unable to connect to the server. Please try again later.",
-//         };
-//     }
-// }
+        return {
+            success: response.ok && json.success,
+            message: json.message || "Unknown error",
+        };
+    } catch (error) {
+        console.error("❌ Error saving email data:", error);
+        return {
+            success: false,
+            message: "Unable to connect to the server. Please try again later.",
+        };
+    }
+}
 
 // Helper functions
 function validateEmailAddresses(recipients) {
