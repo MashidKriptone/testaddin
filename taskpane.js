@@ -66,56 +66,7 @@ async function onMessageSendHandler(eventArgs) {
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
-            function interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments) {
-                const sendButton = document.querySelector("div[role='button'][data-tooltip^='Send']");
-                if (!sendButton) return;
-            
-                sendButton.addEventListener("click", async (e) => {
-                    e.preventDefault();
-            
-                    const bodyElement = document.querySelector("div[aria-label='Message Body']");
-                    const toField = document.querySelector("textarea[name='to']");
-                    const ccField = document.querySelector("textarea[name='cc']");
-                    const bccField = document.querySelector("textarea[name='bcc']");
-                    const subjectField = document.querySelector("input[name='subjectbox']");
-                    const attachmentBox = document.querySelector(".a1.aaA.aMZ");
-            
-                    // Gather data
-                    const rawBody = bodyElement.innerHTML;
-                    const rawAttachments = await getGmailAttachmentData(); // should return: [{ FileName, FileSize, FileType, FileData }]
-            
-                    const emailDataDto = {
-                        FromEmailID: "current_user_email@domain.com", // Replace with actual user
-                        EmailTo: toField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailCc: ccField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailBcc: bccField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailSubject: subjectField?.value || "",
-                        EmailBody: encryptOutgoingEmails ? rawBody : "", // Empty if not encrypting
-                        Attachments: encryptOutgoingAttachments ? rawAttachments : [], // Empty if not encrypting
-                    };
-            
-                    try {
-                        const encrypted = await getEncryptedEmail(emailDataDto);
-            
-                        // Apply encrypted body if policy requires
-                        if (encryptOutgoingEmails && encrypted.EncryptedBody) {
-                            bodyElement.innerHTML = encrypted.EncryptedBody;
-                        }
-            
-                        // Show encrypted attachment message if policy requires
-                        if (encryptOutgoingAttachments && encrypted.Attachments?.length > 0 && attachmentBox) {
-                            attachmentBox.innerHTML = "<p>[Encrypted attachments included - use KntrolFILE Reader]</p>";
-                        }
-            
-                        // Now actually trigger send
-                        sendButton.click();
-            
-                    } catch (error) {
-                        console.error("❌ Gmail Encryption Error:", error);
-                        alert("Encryption failed. Please try again.");
-                    }
-                });
-            }            
+        interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments);
 
             // **1️⃣ If no domain restrictions exist, allow email to send**
         const noDomainRestrictions = allowedDomains.length === 0 && blockedDomains.length === 0;
@@ -173,8 +124,8 @@ async function onMessageSendHandler(eventArgs) {
 
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
-        const saveSuccess = await saveEmailData(emailData);
-
+        // const saveSuccess = await saveEmailData(emailData);
+        
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
         const oldEmail = await fetchEmails(); 
         console.log("Previous Emails ",oldEmail);
@@ -264,6 +215,57 @@ async function getEncryptedEmail(emailDataDto) {
 
     return await response.json();
 }
+
+  function interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments) {
+                const sendButton = document.querySelector("div[role='button'][data-tooltip^='Send']");
+                if (!sendButton) return;
+            
+                sendButton.addEventListener("click", async (e) => {
+                    e.preventDefault();
+            
+                    const bodyElement = document.querySelector("div[aria-label='Message Body']");
+                    const toField = document.querySelector("textarea[name='to']");
+                    const ccField = document.querySelector("textarea[name='cc']");
+                    const bccField = document.querySelector("textarea[name='bcc']");
+                    const subjectField = document.querySelector("input[name='subjectbox']");
+                    const attachmentBox = document.querySelector(".a1.aaA.aMZ");
+            
+                    // Gather data
+                    const rawBody = bodyElement.innerHTML;
+                    const rawAttachments = await getGmailAttachmentData(); // should return: [{ FileName, FileSize, FileType, FileData }]
+            
+                    const emailDataDto = {
+                        FromEmailID: "current_user_email@domain.com", // Replace with actual user
+                        EmailTo: toField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailCc: ccField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailBcc: bccField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailSubject: subjectField?.value || "",
+                        EmailBody: encryptOutgoingEmails ? rawBody : "", // Empty if not encrypting
+                        Attachments: encryptOutgoingAttachments ? rawAttachments : [], // Empty if not encrypting
+                    };
+            
+                    try {
+                        const encrypted = await getEncryptedEmail(emailDataDto);
+            
+                        // Apply encrypted body if policy requires
+                        if (encryptOutgoingEmails && encrypted.EncryptedBody) {
+                            bodyElement.innerHTML = encrypted.EncryptedBody;
+                        }
+            
+                        // Show encrypted attachment message if policy requires
+                        if (encryptOutgoingAttachments && encrypted.Attachments?.length > 0 && attachmentBox) {
+                            attachmentBox.innerHTML = "<p>[Encrypted attachments included - use KntrolFILE Reader]</p>";
+                        }
+            
+                        // Now actually trigger send
+                        sendButton.click();
+            
+                    } catch (error) {
+                        console.error("❌ Gmail Encryption Error:", error);
+                        alert("Encryption failed. Please try again.");
+                    }
+                });
+            }          
 // async function saveEmailData(emailData) {
 //     try {
 //         const token = await getAccessToken();
