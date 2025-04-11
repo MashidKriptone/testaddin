@@ -62,11 +62,62 @@ async function onMessageSendHandler(eventArgs) {
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
         // Fetch policy domains
-        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments } = await fetchPolicyDomains();
+        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments,encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains();
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
-        // **1️⃣ If no domain restrictions exist, allow email to send**
+            function interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments) {
+                const sendButton = document.querySelector("div[role='button'][data-tooltip^='Send']");
+                if (!sendButton) return;
+            
+                sendButton.addEventListener("click", async (e) => {
+                    e.preventDefault();
+            
+                    const bodyElement = document.querySelector("div[aria-label='Message Body']");
+                    const toField = document.querySelector("textarea[name='to']");
+                    const ccField = document.querySelector("textarea[name='cc']");
+                    const bccField = document.querySelector("textarea[name='bcc']");
+                    const subjectField = document.querySelector("input[name='subjectbox']");
+                    const attachmentBox = document.querySelector(".a1.aaA.aMZ");
+            
+                    // Gather data
+                    const rawBody = bodyElement.innerHTML;
+                    const rawAttachments = await getGmailAttachmentData(); // should return: [{ FileName, FileSize, FileType, FileData }]
+            
+                    const emailDataDto = {
+                        FromEmailID: "current_user_email@domain.com", // Replace with actual user
+                        EmailTo: toField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailCc: ccField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailBcc: bccField?.value?.split(",").map(e => e.trim()) || [],
+                        EmailSubject: subjectField?.value || "",
+                        EmailBody: encryptOutgoingEmails ? rawBody : "", // Empty if not encrypting
+                        Attachments: encryptOutgoingAttachments ? rawAttachments : [], // Empty if not encrypting
+                    };
+            
+                    try {
+                        const encrypted = await getEncryptedEmail(emailDataDto);
+            
+                        // Apply encrypted body if policy requires
+                        if (encryptOutgoingEmails && encrypted.EncryptedBody) {
+                            bodyElement.innerHTML = encrypted.EncryptedBody;
+                        }
+            
+                        // Show encrypted attachment message if policy requires
+                        if (encryptOutgoingAttachments && encrypted.Attachments?.length > 0 && attachmentBox) {
+                            attachmentBox.innerHTML = "<p>[Encrypted attachments included - use KntrolFILE Reader]</p>";
+                        }
+            
+                        // Now actually trigger send
+                        sendButton.click();
+            
+                    } catch (error) {
+                        console.error("❌ Gmail Encryption Error:", error);
+                        alert("Encryption failed. Please try again.");
+                    }
+                });
+            }            
+
+            // **1️⃣ If no domain restrictions exist, allow email to send**
         const noDomainRestrictions = allowedDomains.length === 0 && blockedDomains.length === 0;
         if (noDomainRestrictions) {
             console.log("✅ No domain restrictions. Proceeding...");
@@ -185,6 +236,8 @@ async function fetchPolicyDomains() {
             contentScanning: policy.contentScanning,
             attachmentPolicy: policy.attachmentPolicy,
             blockedAttachments: policy.blockedAttachments || [],
+            encryptOutgoingEmails:policy.encryptOutgoingEmails || false,
+            encryptOutgoingAttachments:policy.encryptOutgoingAttachments || false
         };
     } catch (error) {
         console.error("❌ Error fetching policy:", error);
@@ -192,29 +245,48 @@ async function fetchPolicyDomains() {
     }
 }
 
-async function saveEmailData(emailData) {
-    try {
-        const token = await getAccessToken();
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
-            body: JSON.stringify(emailData),
-        });
+async function getEncryptedEmail(emailDataDto) {
+    const token = await getAccessToken();
 
-        const json = await response.json();
+    const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "X-Tenant-ID": "kriptone.com"
+        },
+        body: JSON.stringify(emailDataDto)
+    });
 
-        return {
-            success: response.ok && json.success,
-            message: json.message || "Unknown error",
-        };
-    } catch (error) {
-        console.error("❌ Error saving email data:", error);
-        return {
-            success: false,
-            message: "Unable to connect to the server. Please try again later.",
-        };
+    if (!response.ok) {
+        throw new Error("Encryption request failed: " + response.status);
     }
+
+    return await response.json();
 }
+// async function saveEmailData(emailData) {
+//     try {
+//         const token = await getAccessToken();
+//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+//             body: JSON.stringify(emailData),
+//         });
+
+//         const json = await response.json();
+
+//         return {
+//             success: response.ok && json.success,
+//             message: json.message || "Unknown error",
+//         };
+//     } catch (error) {
+//         console.error("❌ Error saving email data:", error);
+//         return {
+//             success: false,
+//             message: "Unable to connect to the server. Please try again later.",
+//         };
+//     }
+// }
 
 // Helper functions
 function validateEmailAddresses(recipients) {
