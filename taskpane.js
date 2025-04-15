@@ -62,7 +62,7 @@ async function onMessageSendHandler(eventArgs) {
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
         // Fetch policy domains
-        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments,encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains();
+        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments,encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains(token);
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
@@ -112,7 +112,8 @@ async function onMessageSendHandler(eventArgs) {
 
         if (attachmentPolicy) {
             for (const attachment of attachments) {
-                if (blockedAttachments.includes(attachment.name.split('.').pop())) {
+                const ext = attachment.name.substring(attachment.name.lastIndexOf('.') + 1).toLowerCase();
+if (blockedAttachments.includes(ext)) {
                     showOutlookNotification("Restricted Attachment", `Attachment \"${attachment.name}\" is restricted.`);
                     eventArgs.completed({ allowEvent: false });
                     return;
@@ -124,11 +125,14 @@ async function onMessageSendHandler(eventArgs) {
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         if (encryptOutgoingEmails || encryptOutgoingAttachments) {
+            const encrypted = await getEncryptedEmail(emailData ,token);
+            if (encryptOutgoingEmails && encrypted.EncryptedBody) {
+                await item.body.setAsync(encrypted.EncryptedBody, { coercionType: Office.CoercionType.Html });
+            }
+            // Note: Office.js doesn't support modifying attachments during send
+        }
 
-            interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments);
-        }else{
-
-            const saveSuccess = await saveEmailData(emailData);
+            const saveSuccess = await saveEmailData(emailData,token);
             if (saveSuccess.success) {
                 console.log("✅ Email data saved. Ensuring email is sent.");
                 eventArgs.completed({ allowEvent: true });
@@ -137,7 +141,7 @@ async function onMessageSendHandler(eventArgs) {
                 showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
                 eventArgs.completed({ allowEvent: false });
             }
-        }
+        
         
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
         const oldEmail = await fetchEmails(); 
@@ -173,9 +177,8 @@ async function getUserDetails(accessToken) {
 }
 
 // Fetch policy domains from the backend
-async function fetchPolicyDomains() {
+async function fetchPolicyDomains(token) {
     try {
-        const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
@@ -202,9 +205,7 @@ async function fetchPolicyDomains() {
     }
 }
 
-async function getEncryptedEmail(emailDataDto) {
-    const token = await getAccessToken();
-
+async function getEncryptedEmail(emailDataDto,token) {
     const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
         method: "POST",
         headers: {
@@ -272,9 +273,8 @@ async function getEncryptedEmail(emailDataDto) {
                     }
                 });
             }          
-async function saveEmailData(emailData) {
+async function saveEmailData(emailData,token) {
     try {
-        const token = await getAccessToken();
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
