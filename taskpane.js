@@ -125,22 +125,57 @@ if (blockedAttachments.includes(ext)) {
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         if (encryptOutgoingEmails || encryptOutgoingAttachments) {
-            const encrypted = await getEncryptedEmail(emailData ,token);
-            if (encryptOutgoingEmails && encrypted.EncryptedBody) {
-                await item.body.setAsync(encrypted.EncryptedBody, { coercionType: Office.CoercionType.Html });
+            const encryptedEmailData = await getEncryptedEmail(emailData ,token);
+             // STEP 3: Set the email body with the secure instruction note
+    await new Promise((resolve, reject) => {
+        Office.context.mailbox.item.body.setAsync(
+          encryptedEmailData.instructionNote,
+          { coercionType: Office.CoercionType.Html },
+          (asyncResult) => {
+            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+              console.log("✅ Email body set successfully.");
+              resolve();
+            } else {
+              console.error("❌ Failed to set email body:", asyncResult.error);
+              reject(asyncResult.error);
             }
+          }
+        );
+      });
+  
+      // STEP 4: Attach the encrypted .ksf file
+      const attachment = encryptedEmailData.encryptedAttachments[0];
+  
+      await new Promise((resolve, reject) => {
+        Office.context.mailbox.item.addFileAttachmentFromBase64Async(
+          attachment.fileData,
+          attachment.fileName,
+          (asyncResult) => {
+            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+              console.log("📎 Attachment added successfully.");
+              resolve();
+            } else {
+              console.error("❌ Failed to add attachment:", asyncResult.error);
+              reject(asyncResult.error);
+            }
+          }
+        );
+      });
+  
+      console.log("🚀 Email is ready. Sending...");
+      eventArgs.completed({ allowEvent: true });
             // Note: Office.js doesn't support modifying attachments during send
         }
 
-            const saveSuccess = await saveEmailData(emailData,token);
-            if (saveSuccess.success) {
-                console.log("✅ Email data saved. Ensuring email is sent.");
-                eventArgs.completed({ allowEvent: true });
-            } else {
-                console.warn("❌ Email saving failed:", saveSuccess.message);
-                showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
-                eventArgs.completed({ allowEvent: false });
-            }
+            // const saveSuccess = await saveEmailData(emailData,token);
+            // if (saveSuccess.success) {
+            //     console.log("✅ Email data saved. Ensuring email is sent.");
+            //     eventArgs.completed({ allowEvent: true });
+            // } else {
+            //     console.warn("❌ Email saving failed:", saveSuccess.message);
+            //     showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
+            //     eventArgs.completed({ allowEvent: false });
+            // }
         
         
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
@@ -221,79 +256,29 @@ async function getEncryptedEmail(emailDataDto,token) {
 
     return await response.json();
 }
+         
+// async function saveEmailData(emailData,token) {
+//     try {
+//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+//             body: JSON.stringify(emailData),
+//         });
 
-  function interceptGmailAndEncryptWithPolicy(encryptOutgoingEmails,encryptOutgoingAttachments) {
-                const sendButton = document.querySelector("div[role='button'][data-tooltip^='Send']");
-                if (!sendButton) return;
-            
-                sendButton.addEventListener("click", async (e) => {
-                    e.preventDefault();
-            
-                    const bodyElement = document.querySelector("div[aria-label='Message Body']");
-                    const toField = document.querySelector("textarea[name='to']");
-                    const ccField = document.querySelector("textarea[name='cc']");
-                    const bccField = document.querySelector("textarea[name='bcc']");
-                    const subjectField = document.querySelector("input[name='subjectbox']");
-                    const attachmentBox = document.querySelector(".a1.aaA.aMZ");
-            
-                    // Gather data
-                    const rawBody = bodyElement.innerHTML;
-                    const rawAttachments = await getGmailAttachmentData(); // should return: [{ FileName, FileSize, FileType, FileData }]
-            
-                    const emailDataDto = {
-                        FromEmailID: "current_user_email@domain.com", // Replace with actual user
-                        EmailTo: toField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailCc: ccField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailBcc: bccField?.value?.split(",").map(e => e.trim()) || [],
-                        EmailSubject: subjectField?.value || "",
-                        EmailBody: encryptOutgoingEmails ? rawBody : "", // Empty if not encrypting
-                        Attachments: encryptOutgoingAttachments ? rawAttachments : [], // Empty if not encrypting
-                    };
-            
-                    try {
-                        const encrypted = await getEncryptedEmail(emailDataDto);
-            
-                        // Apply encrypted body if policy requires
-                        if (encryptOutgoingEmails && encrypted.EncryptedBody) {
-                            bodyElement.innerHTML = encrypted.EncryptedBody;
-                        }
-            
-                        // Show encrypted attachment message if policy requires
-                        if (encryptOutgoingAttachments && encrypted.Attachments?.length > 0 && attachmentBox) {
-                            attachmentBox.innerHTML = "<p>[Encrypted attachments included - use KntrolFILE Reader]</p>";
-                        }
-            
-                        // Now actually trigger send
-                        sendButton.click();
-            
-                    } catch (error) {
-                        console.error("❌ Gmail Encryption Error:", error);
-                        alert("Encryption failed. Please try again.");
-                    }
-                });
-            }          
-async function saveEmailData(emailData,token) {
-    try {
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
-            body: JSON.stringify(emailData),
-        });
+//         const json = await response.json();
 
-        const json = await response.json();
-
-        return {
-            success: response.ok && json.success,
-            message: json.message || "Unknown error",
-        };
-    } catch (error) {
-        console.error("❌ Error saving email data:", error);
-        return {
-            success: false,
-            message: "Unable to connect to the server. Please try again later.",
-        };
-    }
-}
+//         return {
+//             success: response.ok && json.success,
+//             message: json.message || "Unknown error",
+//         };
+//     } catch (error) {
+//         console.error("❌ Error saving email data:", error);
+//         return {
+//             success: false,
+//             message: "Unable to connect to the server. Please try again later.",
+//         };
+//     }
+// }
 
 // Helper functions
 function validateEmailAddresses(recipients) {
@@ -554,21 +539,17 @@ function updateUI() {
 
 async function fetchEmails(token) {
     try {
-        const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Failed to fetch emails: ${response.statusText}`);
+      const response = await fetch("https://graph.microsoft.com/v1.0/me/messages", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
         }
-        
-        const emails = await response.json();
-        console.log("🔹 Recent emails:", emails);
-        return emails;
+      });
+      if (!response.ok) throw new Error(`Graph API Error: ${response.status}`);
+      return await response.json();
     } catch (error) {
-        console.error("Error fetching emails:", error);
-        throw error;
+      console.error("Error fetching emails:", error.message, error.stack);
+      throw error;
     }
-}
+  }
