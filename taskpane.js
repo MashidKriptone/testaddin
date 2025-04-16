@@ -144,8 +144,7 @@ if (blockedAttachments.includes(ext)) {
         
         
         console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
-        const oldEmail = await fetchEmails(); 
-        console.log("Previous Emails ",oldEmail);
+        const oldEmail = await fetchEmails(token); 
         
        
 
@@ -553,9 +552,8 @@ function updateUI() {
 //     };
 // }
 
-async function fetchEmails() {
+async function fetchEmails(token) {
     try {
-        const token = await getAccessToken();
         const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
             headers: {
                 'Authorization': `Bearer ${token}`
