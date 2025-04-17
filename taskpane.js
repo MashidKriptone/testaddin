@@ -4,7 +4,7 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-         
+
         console.log('Add-in is running in the background.');
     }
 });
@@ -14,7 +14,7 @@ const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,3}$/;
 
 // Regex patterns for additional checks
 const regexPatterns = {
-    email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,3}$/, 
+    email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,3}$/,
     body: /\b(confidential|prohibited|restricted)\b/i,
     attachmentName: /\.(exe|bat|sh)$/i,
     imei: /[^\d](\d{15}|\d{2}\-\d{6}\-\d{6}\-\d)[^\d]/,
@@ -32,7 +32,7 @@ const regexPatterns = {
 // Event handler for the ItemSend event
 async function onMessageSendHandler(eventArgs) {
     try {
-       if (!isInitialized) {
+        if (!isInitialized) {
             initializeMSAL();
         }
 
@@ -61,22 +61,22 @@ async function onMessageSendHandler(eventArgs) {
 
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
-        const oldEmail = await fetchEmails(token); 
-        
+        const oldEmail = await fetchEmails(token);
+
         // Fetch policy domains
-        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments,encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains(token);
+        const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments, encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains(token);
 
         console.log("🔹 Policy Check:", { allowedDomains, blockedDomains });
 
 
-            // **1️⃣ If no domain restrictions exist, allow email to send**
+        // **1️⃣ If no domain restrictions exist, allow email to send**
         const noDomainRestrictions = allowedDomains.length === 0 && blockedDomains.length === 0;
         if (noDomainRestrictions) {
             console.log("✅ No domain restrictions. Proceeding...");
         } else {
             // **2️⃣ Check if the email contains blocked domains**
-            if (isDomainBlocked(toRecipients, blockedDomains) || 
-                isDomainBlocked(ccRecipients, blockedDomains) || 
+            if (isDomainBlocked(toRecipients, blockedDomains) ||
+                isDomainBlocked(ccRecipients, blockedDomains) ||
                 isDomainBlocked(bccRecipients, blockedDomains)) {
                 showOutlookNotification("Blocked Domain", "KntrolEMAIL detected a blocked domain policy and prevented the email from being sent.");
                 eventArgs.completed({ allowEvent: false });
@@ -94,8 +94,8 @@ async function onMessageSendHandler(eventArgs) {
             return;
         }
         // **3️⃣ Validate email addresses**
-        if (!validateEmailAddresses(toRecipients) || 
-            !validateEmailAddresses(ccRecipients) || 
+        if (!validateEmailAddresses(toRecipients) ||
+            !validateEmailAddresses(ccRecipients) ||
             !validateEmailAddresses(bccRecipients)) {
             showOutlookNotification("Invalid Email", "One or more email addresses are invalid.");
             eventArgs.completed({ allowEvent: false });
@@ -115,7 +115,7 @@ async function onMessageSendHandler(eventArgs) {
         if (attachmentPolicy) {
             for (const attachment of attachments) {
                 const ext = attachment.name.substring(attachment.name.lastIndexOf('.') + 1).toLowerCase();
-if (blockedAttachments.includes(ext)) {
+                if (blockedAttachments.includes(ext)) {
                     showOutlookNotification("Restricted Attachment", `Attachment \"${attachment.name}\" is restricted.`);
                     eventArgs.completed({ allowEvent: false });
                     return;
@@ -127,73 +127,81 @@ if (blockedAttachments.includes(ext)) {
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         if (encryptOutgoingEmails || encryptOutgoingAttachments) {
-            const encryptedEmailData = await getEncryptedEmail(emailData ,token);
-             // STEP 3: Set the email body with the secure instruction note
-    await new Promise((resolve, reject) => {
-        Office.context.mailbox.item.body.setAsync(
-          encryptedEmailData.instructionNote,
-          { coercionType: Office.CoercionType.Html },
-          (asyncResult) => {
-            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-              console.log("✅ Email body set successfully.");
-              resolve();
-            } else {
-              console.error("❌ Failed to set email body:", asyncResult.error);
-              reject(asyncResult.error);
-            }
-          }
-        );
-      });
+            const encryptedEmailData = await getEncryptedEmail(emailData, token);
+            // STEP 3: Set the email body with the secure instruction note
+            await new Promise((resolve, reject) => {
+                Office.context.mailbox.item.body.setAsync(
+                    encryptedEmailData.instructionNote,
+                    { coercionType: Office.CoercionType.Html },
+                    (asyncResult) => {
+                        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+                            console.log("✅ Email body set successfully.");
+                            resolve();
+                        } else {
+                            console.error("❌ Failed to set email body:", asyncResult.error);
+                            reject(asyncResult.error);
+                        }
+                    }
+                );
+            });
 
-      const attachments = item.attachments;
-      if (attachments && attachments.length > 0) {
-          for (const attachment of attachments) {
-              item.removeAttachmentAsync(attachment.id);
-          }
-      }
-      // STEP 4: Attach the encrypted .ksf file
-      const attachment = encryptedEmailData.encryptedAttachments[0];
-  
-      await new Promise((resolve, reject) => {
-        Office.context.mailbox.item.addFileAttachmentFromBase64Async(
-          attachment.fileData,
-          attachment.fileName,
-          (asyncResult) => {
-            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-              console.log("📎 Attachment added successfully.");
-              resolve();
-            } else {
-              console.error("❌ Failed to add attachment:", asyncResult.error);
-              reject(asyncResult.error);
+            const attachments = item.attachments;
+
+            for (const attachment of attachments) {
+                Office.context.mailbox.item.removeAttachmentAsync(
+                    attachment.id,
+                    function (result) {
+                        if (result.status === Office.AsyncResultStatus.Succeeded) {
+                            console.log(`✅ Removed attachment: ${attachment.name}`);
+                        } else {
+                            console.error(`❌ Failed to remove attachment: ${attachment.name}`);
+                        }
+                    }
+                );
             }
-          }
-        );
-      });
-  
-      console.log("🚀 Email is ready. Sending...");
-      eventArgs.completed({ allowEvent: true });
+            // STEP 4: Attach the encrypted .ksf file
+            const attachment = encryptedEmailData.encryptedAttachments[0];
+
+            await new Promise((resolve, reject) => {
+                Office.context.mailbox.item.addFileAttachmentFromBase64Async(
+                    attachment.fileData,
+                    attachment.fileName,
+                    (asyncResult) => {
+                        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+                            console.log("📎 Attachment added successfully.");
+                            resolve();
+                        } else {
+                            console.error("❌ Failed to add attachment:", asyncResult.error);
+                            reject(asyncResult.error);
+                        }
+                    }
+                );
+            });
+
+            console.log("🚀 Email is ready. Sending...");
+            eventArgs.completed({ allowEvent: true });
             // Note: Office.js doesn't support modifying attachments during send
         }
 
-            // const saveSuccess = await saveEmailData(emailData,token);
-            // if (saveSuccess.success) {
-            //     console.log("✅ Email data saved. Ensuring email is sent.");
-            //     eventArgs.completed({ allowEvent: true });
-            // } else {
-            //     console.warn("❌ Email saving failed:", saveSuccess.message);
-            //     showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
-            //     eventArgs.completed({ allowEvent: false });
-            // }
-        
-        
+        // const saveSuccess = await saveEmailData(emailData,token);
+        // if (saveSuccess.success) {
+        //     console.log("✅ Email data saved. Ensuring email is sent.");
+        //     eventArgs.completed({ allowEvent: true });
+        // } else {
+        //     console.warn("❌ Email saving failed:", saveSuccess.message);
+        //     showOutlookNotification("Error", saveSuccess.message || "Email saving failed due to a backend error.");
+        //     eventArgs.completed({ allowEvent: false });
+        // }
 
-               
+
+
+
     } catch (error) {
         console.error('❌ Error during send event:', error);
         showOutlookNotification("Error", "An unexpected error occurred while sending the email.");
         eventArgs.completed({ allowEvent: false });
     }
-    
+
 }
 // Get user details from Microsoft Graph
 async function getUserDetails(accessToken) {
@@ -203,11 +211,11 @@ async function getUserDetails(accessToken) {
                 'Authorization': `Bearer ${accessToken}`
             }
         });
-        
+
         if (!response.ok) {
             throw new Error(`Graph API request failed with status ${response.status}`);
         }
-        
+
         return await response.json();
     } catch (error) {
         console.error("Error fetching user details:", error);
@@ -220,7 +228,7 @@ async function fetchPolicyDomains(token) {
     try {
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, "X-Tenant-ID": "kriptone.com", },
         });
 
         if (!response.ok) throw new Error('Failed to fetch policy data: ' + response.statusText);
@@ -235,8 +243,8 @@ async function fetchPolicyDomains(token) {
             contentScanning: policy.contentScanning,
             attachmentPolicy: policy.attachmentPolicy,
             blockedAttachments: policy.blockedAttachments || [],
-            encryptOutgoingEmails:policy.encryptOutgoingEmails || false,
-            encryptOutgoingAttachments:policy.encryptOutgoingAttachments || false
+            encryptOutgoingEmails: policy.encryptOutgoingEmails || false,
+            encryptOutgoingAttachments: policy.encryptOutgoingAttachments || false
         };
     } catch (error) {
         console.error("❌ Error fetching policy:", error);
@@ -244,7 +252,7 @@ async function fetchPolicyDomains(token) {
     }
 }
 
-async function getEncryptedEmail(emailDataDto,token) {
+async function getEncryptedEmail(emailDataDto, token) {
     const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
         method: "POST",
         headers: {
@@ -261,7 +269,7 @@ async function getEncryptedEmail(emailDataDto,token) {
 
     return await response.json();
 }
-         
+
 // async function saveEmailData(emailData,token) {
 //     try {
 //         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
@@ -390,20 +398,20 @@ let authInProgress = false;
 // Initialize MSAL
 function initializeMSAL() {
     if (isInitialized) return;
-    
+
     msalInstance = new msal.PublicClientApplication(msalConfig);
     isInitialized = true;
-    
+
     // Handle redirect response if any
     msalInstance.handleRedirectPromise()
         .then(handleAuthResponse)
         .catch(error => {
             console.error("Redirect handling error:", error);
         });
-        // Set up button event listeners
+    // Set up button event listeners
     document.getElementById("signInButton").addEventListener("click", signIn);
     document.getElementById("signOutButton").addEventListener("click", signOut);
-    
+
     // Update UI based on current auth state
     updateUI();
 }
@@ -464,13 +472,13 @@ async function loginAndGetToken() {
 
         // First login
         const loginResponse = await msalInstance.loginPopup(loginRequest);
-        
+
         // Then get token
         const tokenRequest = {
             scopes: ["User.Read", "Mail.Send"],
             account: loginResponse.account
         };
-        
+
         const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
         return tokenResponse.accessToken;
     } finally {
@@ -485,7 +493,7 @@ async function signIn() {
             scopes: ["User.Read", "Mail.Send"],
             prompt: "select_account"
         };
-        
+
         const loginResponse = await msalInstance.loginPopup(loginRequest);
         console.log("Login successful:", loginResponse);
         updateUI();
@@ -517,10 +525,10 @@ async function signOut() {
 function updateUI() {
     const accounts = msalInstance?.getAllAccounts() || [];
     const isSignedIn = accounts.length > 0;
-    
+
     document.getElementById("signInButton").style.display = isSignedIn ? "none" : "block";
     document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
-    
+
     if (isSignedIn) {
         console.log("User is signed in as:", accounts[0].username);
     } else {
@@ -549,11 +557,11 @@ async function fetchEmails(token) {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) {
             throw new Error(`Failed to fetch emails: ${response.statusText}`);
         }
-        
+
         const emails = await response.json();
         console.log("🔹 Recent emails:", emails);
         return emails;
