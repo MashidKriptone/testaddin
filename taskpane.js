@@ -61,6 +61,8 @@ async function onMessageSendHandler(eventArgs) {
 
         console.log("🔹 Email Details:", { from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments });
 
+        const oldEmail = await fetchEmails(token); 
+        
         // Fetch policy domains
         const { allowedDomains, blockedDomains, contentScanning, attachmentPolicy, blockedAttachments,encryptOutgoingEmails, encryptOutgoingAttachments } = await fetchPolicyDomains(token);
 
@@ -184,11 +186,8 @@ if (blockedAttachments.includes(ext)) {
             // }
         
         
-        console.log("✅ Email Passed Validation. Fetching Microsoft Graph Emails...");
-        const oldEmail = await fetchEmails(token); 
-        
-       
 
+               
     } catch (error) {
         console.error('❌ Error during send event:', error);
         showOutlookNotification("Error", "An unexpected error occurred while sending the email.");
