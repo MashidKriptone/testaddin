@@ -142,7 +142,13 @@ if (blockedAttachments.includes(ext)) {
           }
         );
       });
-  
+
+      const attachments = item.attachments;
+      if (attachments && attachments.length > 0) {
+          for (const attachment of attachments) {
+              item.removeAttachmentAsync(attachment.id);
+          }
+      }
       // STEP 4: Attach the encrypted .ksf file
       const attachment = encryptedEmailData.encryptedAttachments[0];
   
@@ -539,17 +545,21 @@ function updateUI() {
 
 async function fetchEmails(token) {
     try {
-      const response = await fetch("https://graph.microsoft.com/v1.0/me/messages", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+        const response = await fetch('https://graph.microsoft.com/v1.0/me/messages?$top=10', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch emails: ${response.statusText}`);
         }
-      });
-      if (!response.ok) throw new Error(`Graph API Error: ${response.status}`);
-      return await response.json();
+        
+        const emails = await response.json();
+        console.log("🔹 Recent emails:", emails);
+        return emails;
     } catch (error) {
-      console.error("Error fetching emails:", error.message, error.stack);
-      throw error;
+        console.error("Error fetching emails:", error);
+        throw error;
     }
-  }
+}
