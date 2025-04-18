@@ -320,23 +320,37 @@ function isDomainBlocked(recipients, blockedDomains) {
 
 async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     let emailId = generateUUID();
-    const processedAttachments = await Promise.all(
+    const attachmentPayloads = await Promise.all(
         attachments.map(async (attachment) => {
-            const fileData = await getAttachmentBase64(attachment.id); // Fetch & convert to base64
+            if (!attachment.id) {
+                console.error("❌ attachment.id is missing!");
+                return null; // or continue
+            }
+            const base64 = await getAttachmentBase64(attachment.id);
+if (!base64) {
+    console.error("❌ Failed to get base64 of attachment");
+}
+            let fileData = null;
+            try {
+                fileData = await getAttachmentBase64(attachment.id);
+            } catch (e) {
+                console.error("❌ Error getting base64 file data:", e);
+            }
+
             return {
                 Id: generateUUID(),
                 FileName: attachment.name,
                 FileType: attachment.attachmentType,
                 FileSize: attachment.size,
                 UploadTime: new Date().toISOString(),
-                FileData: fileData // Base64-encoded string
+                FileData: fileData,
             };
         })
     );
     return {
         Id: emailId,
         FromEmailID: from,
-        Attachments: processedAttachments,
+        Attachments: attachmentPayloads,
         EmailBcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
         EmailCc: cc ? cc.split(',').map(email => email.trim()) : [],
         EmailBody: body,
