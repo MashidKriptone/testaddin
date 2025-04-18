@@ -374,8 +374,13 @@ function getAttachmentBase64(attachmentId) {
         Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
             if (result.status === "succeeded") {
                 const token = result.value;
-                const itemId = Office.context.mailbox.item.itemId;
-                const url = Office.context.mailbox.restUrl + "/v2.0/me/messages/" + itemId + "/attachments/" + attachmentId + "/$value";
+                
+                const itemId = Office.context.mailbox.convertToRestId(
+                    Office.context.mailbox.item.itemId,
+                    Office.MailboxEnums.RestVersion.v2_0
+                );
+
+                const url = `${Office.context.mailbox.restUrl}/v2.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
 
                 fetch(url, {
                     method: "GET",
