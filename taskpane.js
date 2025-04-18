@@ -318,18 +318,25 @@ function isDomainBlocked(recipients, blockedDomains) {
     return false;
 }
 
-function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
+async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     let emailId = generateUUID();
+    const processedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+            const fileData = await getAttachmentBase64(attachment.id); // Fetch & convert to base64
+            return {
+                Id: generateUUID(),
+                FileName: attachment.name,
+                FileType: attachment.attachmentType,
+                FileSize: attachment.size,
+                UploadTime: new Date().toISOString(),
+                FileData: fileData // Base64-encoded string
+            };
+        })
+    );
     return {
         Id: emailId,
         FromEmailID: from,
-        Attachments: attachments.map(attachment => ({
-            Id: generateUUID(),
-            FileName: attachment.name,
-            FileType: attachment.attachmentType,
-            FileSize: attachment.size,
-            UploadTime: new Date().toISOString(),
-        })),
+        Attachments: processedAttachments,
         EmailBcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
         EmailCc: cc ? cc.split(',').map(email => email.trim()) : [],
         EmailBody: body,
@@ -338,6 +345,44 @@ function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
         Timestamp: new Date().toISOString(),
     };
 }
+
+async function getAttachmentBase64(attachmentId) {
+    return new Promise((resolve, reject) => {
+        Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+                const accessToken = result.value;
+                const itemId = Office.context.mailbox.item.itemId;
+
+                const url = `https://outlook.office.com/api/v2.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
+
+                fetch(url, {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    }
+                })
+                    .then(res => res.arrayBuffer())
+                    .then(buffer => {
+                        const base64String = arrayBufferToBase64(buffer);
+                        resolve(base64String);
+                    })
+                    .catch(err => reject("Attachment fetch failed: " + err));
+            } else {
+                reject("Token fetch failed");
+            }
+        });
+    });
+}
+
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
 
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
