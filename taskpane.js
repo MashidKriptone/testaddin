@@ -321,20 +321,22 @@ function isDomainBlocked(recipients, blockedDomains) {
 async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     let emailId = generateUUID();
 
+    console.log("📎 Attachments Received for Processing:", attachments);
+    attachments.forEach(att => console.log("🔎 Checking attachment ID:", att?.id));
     const attachmentPayloads = await Promise.all(
+        
         attachments.map(async (attachment) => {
-            let fileData = null;
-
-            // SAFETY: Check if attachment has a valid id
             if (!attachment || !attachment.id) {
-                console.warn("⚠️ Skipping attachment due to missing ID:", attachment);
-                return null; // or return an empty shell object
+                console.warn("⚠️ Skipping invalid attachment:", attachment);
+                return null;
             }
 
+            let fileData = null;
             try {
                 fileData = await getAttachmentBase64(attachment.id);
             } catch (error) {
-                console.error("❌ Error getting base64 for attachment:", attachment.name, error);
+                console.error(`❌ Error getting base64 for attachment: ${attachment.name}`, error);
+                return null;
             }
 
             return {
@@ -348,13 +350,10 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
         })
     );
 
-    // Filter out any attachments that were skipped
-    const filteredAttachments = attachmentPayloads.filter(att => att !== null);
-
     return {
         Id: emailId,
         FromEmailID: from,
-        Attachments: filteredAttachments,
+        Attachments: attachmentPayloads.filter(att => att !== null),
         EmailBcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
         EmailCc: cc ? cc.split(',').map(email => email.trim()) : [],
         EmailBody: body,
@@ -364,44 +363,44 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     };
 }
 
+
 function getAttachmentBase64(attachmentId) {
     return new Promise((resolve, reject) => {
-        const item = Office.context.mailbox.item;
-        const itemId = Office.context.mailbox.convertToRestId(
-            item.itemId,
-            Office.MailboxEnums.RestVersion.v2_0
-        );
-
-        if (!itemId) {
-            reject("Invalid item ID");
-            return;
+        if (!attachmentId) {
+            console.error("❌ Invalid attachmentId:", attachmentId);
+            return reject("Attachment ID is null or undefined");
         }
 
         Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
-            if (result.status === Office.AsyncResultStatus.Succeeded) {
-                const accessToken = result.value;
-
-                const url = `https://outlook.office.com/api/v2.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
+            if (result.status === "succeeded") {
+                const token = result.value;
+                const itemId = Office.context.mailbox.item.itemId;
+                const url = Office.context.mailbox.restUrl + "/v2.0/me/messages/" + itemId + "/attachments/" + attachmentId + "/$value";
 
                 fetch(url, {
                     method: "GET",
                     headers: {
-                        Authorization: `Bearer ${accessToken}`
+                        Authorization: "Bearer " + token,
+                        Accept: "application/json; odata.metadata=none"
                     }
                 })
-                    .then(res => {
-                        if (!res.ok) {
-                            throw new Error(`Failed to fetch attachment: ${res.status}`);
-                        }
-                        return res.arrayBuffer();
-                    })
-                    .then(buffer => {
-                        const base64String = arrayBufferToBase64(buffer);
-                        resolve(base64String);
-                    })
-                    .catch(err => reject("Attachment fetch failed: " + err.message));
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch attachment data: " + response.status);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                    resolve(base64String);
+                })
+                .catch(err => {
+                    console.error("❌ Fetch error:", err);
+                    reject(err);
+                });
             } else {
-                reject("Token fetch failed: " + result.error.message);
+                console.error("❌ Failed to get token", result.error);
+                reject(result.error);
             }
         });
     });
