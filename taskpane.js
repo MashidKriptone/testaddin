@@ -128,6 +128,7 @@ async function onMessageSendHandler(eventArgs) {
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
         if (encryptOutgoingEmails || encryptOutgoingAttachments) {
             const encryptedEmailData = await getEncryptedEmail(emailData, token);
+            console.log("Email Data",encryptedEmailData);
             // STEP 3: Set the email body with the secure instruction note
             await new Promise((resolve, reject) => {
                 Office.context.mailbox.item.body.setAsync(
@@ -145,20 +146,26 @@ async function onMessageSendHandler(eventArgs) {
                 );
             });
 
-            const attachments = item.attachments;
-
-            for (const attachment of attachments) {
-                Office.context.mailbox.item.removeAttachmentAsync(
-                    attachment.id,
-                    function (result) {
-                        if (result.status === Office.AsyncResultStatus.Succeeded) {
-                            console.log(`✅ Removed attachment: ${attachment.name}`);
+            Office.context.mailbox.item.getAttachmentsAsync((result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                  const attachments = result.value;
+                  if (Array.isArray(attachments) && attachments.length > 0) {
+                    for (const attachment of attachments) {
+                      Office.context.mailbox.item.removeAttachmentAsync(attachment.id, (removeResult) => {
+                        if (removeResult.status === Office.AsyncResultStatus.Succeeded) {
+                          console.log(`✅ Removed attachment: ${attachment.name}`);
                         } else {
-                            console.error(`❌ Failed to remove attachment: ${attachment.name}`);
+                          console.error(`❌ Failed to remove attachment: ${attachment.name}`);
                         }
+                      });
                     }
-                );
-            }
+                  } else {
+                    console.log("ℹ️ No attachments to remove.");
+                  }
+                } else {
+                  console.error("❌ Failed to get attachments:", result.error.message);
+                }
+              });
             // STEP 4: Attach the encrypted .ksf file
             const attachment = encryptedEmailData.encryptedAttachments[0];
 
