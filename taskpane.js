@@ -346,28 +346,44 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     };
 }
 
-async function getAttachmentBase64(attachmentId) {
+function getAttachmentBase64(attachmentId) {
     return new Promise((resolve, reject) => {
+        const item = Office.context.mailbox.item;
+        const itemId = Office.context.mailbox.convertToRestId(
+            item.itemId,
+            Office.MailboxEnums.RestVersion.v2_0
+        );
+
+        if (!itemId) {
+            reject("Invalid item ID");
+            return;
+        }
+
         Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
             if (result.status === Office.AsyncResultStatus.Succeeded) {
                 const accessToken = result.value;
-                const itemId = Office.context.mailbox.item.itemId;
 
                 const url = `https://outlook.office.com/api/v2.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
 
                 fetch(url, {
+                    method: "GET",
                     headers: {
                         Authorization: `Bearer ${accessToken}`
                     }
                 })
-                    .then(res => res.arrayBuffer())
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error(`Failed to fetch attachment: ${res.status}`);
+                        }
+                        return res.arrayBuffer();
+                    })
                     .then(buffer => {
                         const base64String = arrayBufferToBase64(buffer);
                         resolve(base64String);
                     })
-                    .catch(err => reject("Attachment fetch failed: " + err));
+                    .catch(err => reject("Attachment fetch failed: " + err.message));
             } else {
-                reject("Token fetch failed");
+                reject("Token fetch failed: " + result.error.message);
             }
         });
     });
