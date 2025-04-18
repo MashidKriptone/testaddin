@@ -320,37 +320,41 @@ function isDomainBlocked(recipients, blockedDomains) {
 
 async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     let emailId = generateUUID();
+
     const attachmentPayloads = await Promise.all(
         attachments.map(async (attachment) => {
-            if (!attachment.id) {
-                console.error("❌ attachment.id is missing!");
-                return null; // or continue
-            }
-            const base64 = await getAttachmentBase64(attachment.id);
-if (!base64) {
-    console.error("❌ Failed to get base64 of attachment");
-}
             let fileData = null;
+
+            // SAFETY: Check if attachment has a valid id
+            if (!attachment || !attachment.id) {
+                console.warn("⚠️ Skipping attachment due to missing ID:", attachment);
+                return null; // or return an empty shell object
+            }
+
             try {
                 fileData = await getAttachmentBase64(attachment.id);
-            } catch (e) {
-                console.error("❌ Error getting base64 file data:", e);
+            } catch (error) {
+                console.error("❌ Error getting base64 for attachment:", attachment.name, error);
             }
 
             return {
                 Id: generateUUID(),
-                FileName: attachment.name,
-                FileType: attachment.attachmentType,
-                FileSize: attachment.size,
+                FileName: attachment.name || 'Unknown',
+                FileType: attachment.attachmentType || 'application/octet-stream',
+                FileSize: attachment.size || 0,
                 UploadTime: new Date().toISOString(),
                 FileData: fileData,
             };
         })
     );
+
+    // Filter out any attachments that were skipped
+    const filteredAttachments = attachmentPayloads.filter(att => att !== null);
+
     return {
         Id: emailId,
         FromEmailID: from,
-        Attachments: attachmentPayloads,
+        Attachments: filteredAttachments,
         EmailBcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
         EmailCc: cc ? cc.split(',').map(email => email.trim()) : [],
         EmailBody: body,
