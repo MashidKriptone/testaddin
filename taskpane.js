@@ -429,7 +429,13 @@ async function fetchPolicyDomains(token) {
 
 async function getEncryptedEmail(emailDataDto, token) {
     try {
-        console.log("📤 Sending email data to encryption API");
+        console.log("📤 Sending email data to encryption API", {
+            emailId: emailDataDto.id,
+            from: emailDataDto.fromEmailID,
+            recipientCount: emailDataDto.emailTo.length + emailDataDto.emailCc.length + emailDataDto.emailBcc.length,
+            attachmentCount: emailDataDto.attachments.length
+        });
+
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
@@ -437,39 +443,48 @@ async function getEncryptedEmail(emailDataDto, token) {
                 "Authorization": `Bearer ${token}`,
                 "X-Tenant-ID": "kriptone.com"
             },
-            body: JSON.stringify(emailDataDto)
+            body: JSON.stringify({
+                ...emailDataDto,
+                // Ensure we're not sending excessively large attachments
+                attachments: emailDataDto.attachments.map(att => ({
+                    ...att,
+                    fileData: att.fileData.length > 1000000 ? "[LARGE_FILE_TRUNCATED]" : att.fileData
+                }))
+            })
         });
 
         if (!response.ok) {
-            // Clone the response before reading it
-            const responseClone = response.clone();
-            let errorBody;
+            let errorDetails;
             try {
-                errorBody = await responseClone.json();
+                // Try to get the error response as JSON first
+                errorDetails = await response.json();
             } catch (e) {
-                errorBody = await response.text();
+                // Fall back to text if JSON parsing fails
+                errorDetails = await response.text();
             }
-            
-            console.error("API Error Details:", {
+
+            console.error("🔴 API Error Response:", {
                 status: response.status,
-                statusText: response.statusText,
-                errorBody
+                url: response.url,
+                errorDetails
             });
-            
-            throw new Error(`API request failed with status ${response.status}`);
+
+            throw new Error(`Email encryption failed: ${response.status} - ${JSON.stringify(errorDetails)}`);
         }
 
         return await response.json();
     } catch (error) {
-        console.error("Full error details:", {
+        console.error("❌ Full encryption error details:", {
             error: error.message,
             stack: error.stack,
             requestPayload: {
                 ...emailDataDto,
-                attachments: emailDataDto.attachments ? emailDataDto.attachments.map(a => ({
-                    ...a,
-                    fileData: a.fileData ? `[base64 data - length: ${a.fileData.length}]` : null
-                })) : null
+                attachments: emailDataDto.attachments.map(att => ({
+                    fileName: att.fileName,
+                    size: att.fileSize,
+                    type: att.fileType,
+                    dataLength: att.fileData?.length || 0
+                }))
             }
         });
         throw error;
