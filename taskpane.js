@@ -327,8 +327,8 @@ console.log("📥 Preparing email data...");
 const itemId = await saveItemAndGetId();
 
 // Step 2: Get attachments
-const attachments = item.attachments || [];
-console.log("📎 Attachments Received for Processing:", attachments);
+const processedAttachments  = item.attachments || [];
+console.log("📎 Attachments Received for Processing:", processedAttachments );
 
 const attachmentPayloads = await Promise.all(
   attachments.map(async (attachment) => {
