@@ -126,6 +126,7 @@ async function onMessageSendHandler(eventArgs) {
 
         // **6️⃣ Save email data to API before sending**
         const emailData = prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
+        console.log("📤 Sending email data to encryption API:", emailData);
         if (encryptOutgoingEmails || encryptOutgoingAttachments) {
             const encryptedEmailData = await getEncryptedEmail(emailData, token);
             console.log("Email Data",encryptedEmailData);
@@ -270,9 +271,11 @@ async function getEncryptedEmail(emailDataDto, token) {
         body: JSON.stringify(emailDataDto)
     });
 
-    if (!response.ok) {
-        throw new Error("Encryption request failed: " + response.status);
-    }
+if (!response.ok) {
+  const errorBody = await response.text(); // Get actual server error text
+  console.error("❌ Server responded with:", response.status, errorBody);
+  throw new Error(`Encryption request failed: ${response.status}`);
+}
 
     return await response.json();
 }
