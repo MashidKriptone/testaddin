@@ -178,40 +178,44 @@ async function onMessageSendHandler(eventArgs) {
 
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
-        let emailData;
+       let emailData;
         try {
-            emailData = await prepareEmailData(
-                from, 
-                toRecipients, 
-                ccRecipients, 
-                bccRecipients, 
-                subject, 
-                body, 
-                attachments
-            );
-            console.log('ℹ️ Prepared email data structure:', Object.keys(emailData));
+            emailData = await prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
+            console.log("ℹ️ Prepared email data structure:", {
+                id: emailData.id,
+                from: emailData.fromEmailID,
+                toCount: emailData.emailTo.length,
+                ccCount: emailData.emailCc.length,
+                bccCount: emailData.emailBcc.length,
+                subjectLength: emailData.emailSubject.length,
+                bodyLength: emailData.emailBody.length,
+                attachmentCount: emailData.attachments.length
+            });
         } catch (error) {
-            console.error('❌ Failed to prepare email data:', error);
+            console.error("Error preparing email data:", error);
             await showOutlookNotification("Error", "Failed to prepare email for sending");
             eventArgs.completed({ allowEvent: false });
             return;
         }
 
-        // 12. Handle encryption if required
+        // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
-            console.log('🔐 Encrypting email...');
+            console.log("🔐 Encrypting email...");
             try {
                 const encryptedResult = await getEncryptedEmail(emailData, token);
-                console.log('ℹ️ Encryption result:', encryptedResult ? 'success' : 'failed');
+                
+                if (!encryptedResult) {
+                    throw new Error("No response from encryption service");
+                }
 
-                // Update email with encrypted content
+                console.log("ℹ️ Encryption result received");
                 await updateEmailWithEncryptedContent(item, encryptedResult);
                 
-                console.log('✅ Email prepared with encryption');
+                console.log("✅ Email prepared with encryption");
                 eventArgs.completed({ allowEvent: true });
                 return;
             } catch (error) {
-                console.error('❌ Encryption failed:', error);
+                console.error("❌ Encryption failed:", error);
                 await showOutlookNotification(
                     "Encryption Error", 
                     "Failed to encrypt email. Please try again or contact support."
@@ -424,15 +428,8 @@ async function fetchPolicyDomains(token) {
 }
 
 async function getEncryptedEmail(emailDataDto, token) {
-    // Validate the payload before sending
-    if (!emailDataDto.fromEmailID || 
-        (!emailDataDto.emailTo?.length && 
-         !emailDataDto.emailCc?.length && 
-         !emailDataDto.emailBcc?.length)) {
-        throw new Error("Invalid email data: missing required fields");
-    }
-
     try {
+        console.log("📤 Sending email data to encryption API");
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
@@ -444,22 +441,36 @@ async function getEncryptedEmail(emailDataDto, token) {
         });
 
         if (!response.ok) {
+            // Clone the response before reading it
+            const responseClone = response.clone();
             let errorBody;
             try {
-                errorBody = await response.json();
-                console.error("❌ Server error details:", errorBody);
+                errorBody = await responseClone.json();
             } catch (e) {
                 errorBody = await response.text();
             }
-            throw new Error(`Encryption request failed: ${response.status} - ${JSON.stringify(errorBody)}`);
+            
+            console.error("API Error Details:", {
+                status: response.status,
+                statusText: response.statusText,
+                errorBody
+            });
+            
+            throw new Error(`API request failed with status ${response.status}`);
         }
 
         return await response.json();
     } catch (error) {
-        console.error("❌ Full error details:", {
+        console.error("Full error details:", {
             error: error.message,
             stack: error.stack,
-            requestPayload: emailDataDto
+            requestPayload: {
+                ...emailDataDto,
+                attachments: emailDataDto.attachments ? emailDataDto.attachments.map(a => ({
+                    ...a,
+                    fileData: a.fileData ? `[base64 data - length: ${a.fileData.length}]` : null
+                })) : null
+            }
         });
         throw error;
     }
@@ -513,7 +524,7 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     // Fallback for itemId
     let itemId = item.itemId;
     if (!itemId) {
-        console.warn("⚠️ itemId not available, using fallback ID");
+        console.log("ℹ️ Using temporary ID since itemId isn't available in this context");
         itemId = `temp-${emailId}`;
     }
 
@@ -530,12 +541,16 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
 
         try {
             let base64Data;
-            // Try Graph API first
+            // Try fallback method first since Graph API requires itemId
             try {
-                base64Data = await fetchAttachmentBase64UsingGraph(itemId, attachment.id);
-            } catch (graphError) {
-                console.warn("⚠️ Graph API failed, trying fallback method:", graphError);
                 base64Data = await getAttachmentBase64Fallback(attachment);
+            } catch (fallbackError) {
+                console.warn("⚠️ Fallback method failed, trying Graph API:", fallbackError);
+                if (itemId && !itemId.startsWith('temp-')) {
+                    base64Data = await fetchAttachmentBase64UsingGraph(itemId, attachment.id);
+                } else {
+                    throw new Error("Cannot use Graph API without proper itemId");
+                }
             }
 
             attachmentPayloads.push({
@@ -548,6 +563,7 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
             });
         } catch (err) {
             console.error(`❌ Error processing attachment: ${attachment.name}`, err);
+            // Continue with other attachments even if one fails
         }
     }
 
@@ -589,6 +605,34 @@ async function getAttachmentBase64Fallback(attachment) {
     });
 }
   
+  async function fetchAttachmentBase64UsingGraph(itemId, attachmentId) {
+    try {
+        const token = await getAccessToken();
+        const response = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${itemId}/attachments/${attachmentId}/$value`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Graph API request failed with status ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result.split(',')[1];
+                resolve(base64String);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error("Graph API attachment fetch failed:", error);
+        throw error;
+    }
+}
 
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
