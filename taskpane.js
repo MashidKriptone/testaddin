@@ -366,7 +366,7 @@ async function updateEmailWithEncryptedContent(item, encryptedResult) {
             );
         });
 
-        // Step 2: Remove existing attachments
+        // Step 2: Remove existing attachments (only if there are any)
         const attachments = await new Promise(resolve => {
             item.getAttachmentsAsync(resolve);
         });
@@ -381,11 +381,6 @@ async function updateEmailWithEncryptedContent(item, encryptedResult) {
 
         // Step 3: Add encrypted attachment with validation
         await new Promise((resolve, reject) => {
-            if (!encryptedResult.encryptedFile) {
-                reject(new Error("Cannot add attachment - encryptedFile is null"));
-                return;
-            }
-
             item.addFileAttachmentFromBase64Async(
                 encryptedResult.encryptedFile,
                 encryptedResult.fileName || "secure-message.ksf",
@@ -494,13 +489,16 @@ async function getEncryptedEmail(emailDataDto, token) {
         const responseData = await response.json();
         
         // Validate the response contains required fields
-        if (!responseData.encryptedFile) {
-            throw new Error("API response missing required encryptedFile field");
+        if (!responseData.encryptedAttachments || responseData.encryptedAttachments.length === 0) {
+            throw new Error("API response missing required encrypted attachments");
         }
 
+        // Use the first attachment as the encrypted file
+        const mainAttachment = responseData.encryptedAttachments[0];
+        
         return {
-            encryptedFile: responseData.encryptedFile,
-            fileName: responseData.fileName || "secure-message.ksf",
+            encryptedFile: mainAttachment.fileData,
+            fileName: mainAttachment.fileName || "secure-message.ksf",
             instructionNote: responseData.instructionNote || 
                 "This email is secured. Please use the attached file to view the content."
         };
