@@ -178,48 +178,51 @@ async function onMessageSendHandler(eventArgs) {
 
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
-       let emailData;
+        let emailData;
         try {
             emailData = await prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
-            console.log("ℹ️ Prepared email data structure:", {
-                id: emailData.id,
-                from: emailData.fromEmailID,
-                toCount: emailData.emailTo.length,
-                ccCount: emailData.emailCc.length,
-                bccCount: emailData.emailBcc.length,
-                subjectLength: emailData.emailSubject.length,
-                bodyLength: emailData.emailBody.length,
-                attachmentCount: emailData.attachments.length
-            });
+            
+            // Additional validation before sending to API
+            if (emailData.attachments.some(att => !att.fileData)) {
+                throw new Error("One or more attachments failed to process");
+            }
         } catch (error) {
-            console.error("Error preparing email data:", error);
-            await showOutlookNotification("Error", "Failed to prepare email for sending");
+            console.error("❌ Email preparation failed:", error);
+            await showOutlookNotification(
+                "Preparation Error", 
+                error.message.includes("attachments") ?
+                    "Could not process attachments. Please try again." :
+                    "Invalid email data. Please check recipients and try again."
+            );
             eventArgs.completed({ allowEvent: false });
             return;
         }
 
-        // Handle encryption if required
+        // Handle encryption
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
-            console.log("🔐 Encrypting email...");
             try {
+                console.log("🔐 Attempting encryption...");
                 const encryptedResult = await getEncryptedEmail(emailData, token);
                 
-                if (!encryptedResult) {
-                    throw new Error("No response from encryption service");
+                if (!encryptedResult?.encryptedFile) {
+                    throw new Error("Invalid response from encryption service");
                 }
 
-                console.log("ℹ️ Encryption result received");
                 await updateEmailWithEncryptedContent(item, encryptedResult);
-                
-                console.log("✅ Email prepared with encryption");
                 eventArgs.completed({ allowEvent: true });
                 return;
+                
             } catch (error) {
                 console.error("❌ Encryption failed:", error);
-                await showOutlookNotification(
-                    "Encryption Error", 
-                    "Failed to encrypt email. Please try again or contact support."
-                );
+                
+                let userMessage = "Failed to encrypt email. ";
+                if (error.message.includes("null") || error.message.includes("base64")) {
+                    userMessage += "Attachment processing failed. Please remove attachments and try again.";
+                } else {
+                    userMessage += "Please try again or contact support.";
+                }
+                
+                await showOutlookNotification("Encryption Failed", userMessage);
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
@@ -427,15 +430,21 @@ async function fetchPolicyDomains(token) {
     }
 }
 
-async function getEncryptedEmail(emailDataDto, token) {
-    try {
-        console.log("📤 Sending email data to encryption API", {
-            emailId: emailDataDto.id,
-            from: emailDataDto.fromEmailID,
-            recipientCount: emailDataDto.emailTo.length + emailDataDto.emailCc.length + emailDataDto.emailBcc.length,
-            attachmentCount: emailDataDto.attachments.length
-        });
+async function getEncryptedEmail(emailData, token) {
+    // Validate all required fields
+    if (!emailData.fromEmailID || !emailRegex.test(emailData.fromEmailID)) {
+        throw new Error("Invalid sender email address");
+    }
 
+    // Ensure all attachments have valid base64 data
+    const validatedAttachments = emailData.attachments.map(att => {
+        if (!att.fileData) {
+            throw new Error(`Attachment ${att.fileName} has no file data`);
+        }
+        return att;
+    });
+
+    try {
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
@@ -444,47 +453,28 @@ async function getEncryptedEmail(emailDataDto, token) {
                 "X-Tenant-ID": "kriptone.com"
             },
             body: JSON.stringify({
-                ...emailDataDto,
-                // Ensure we're not sending excessively large attachments
-                attachments: emailDataDto.attachments.map(att => ({
-                    ...att,
-                    fileData: att.fileData.length > 1000000 ? "[LARGE_FILE_TRUNCATED]" : att.fileData
-                }))
+                ...emailData,
+                attachments: validatedAttachments
             })
         });
 
         if (!response.ok) {
-            let errorDetails;
-            try {
-                // Try to get the error response as JSON first
-                errorDetails = await response.json();
-            } catch (e) {
-                // Fall back to text if JSON parsing fails
-                errorDetails = await response.text();
-            }
-
-            console.error("🔴 API Error Response:", {
-                status: response.status,
-                url: response.url,
-                errorDetails
-            });
-
-            throw new Error(`Email encryption failed: ${response.status} - ${JSON.stringify(errorDetails)}`);
+            const errorText = await response.text();
+            throw new Error(`API responded with ${response.status}: ${errorText}`);
         }
 
         return await response.json();
     } catch (error) {
-        console.error("❌ Full encryption error details:", {
+        console.error("Encryption API error:", {
             error: error.message,
-            stack: error.stack,
-            requestPayload: {
-                ...emailDataDto,
-                attachments: emailDataDto.attachments.map(att => ({
-                    fileName: att.fileName,
-                    size: att.fileSize,
-                    type: att.fileType,
-                    dataLength: att.fileData?.length || 0
-                }))
+            request: {
+                from: emailData.fromEmailID,
+                subject: emailData.emailSubject,
+                attachmentCount: emailData.attachments.length,
+                firstAttachment: emailData.attachments[0] ? {
+                    name: emailData.attachments[0].fileName,
+                    dataLength: emailData.attachments[0].fileData.length
+                } : null
             }
         });
         throw error;
@@ -530,73 +520,83 @@ function isDomainBlocked(recipients, blockedDomains) {
     }
     return false;
 }
-async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
-    let emailId = generateUUID();
-    const item = Office.context.mailbox.item;
-
-    console.log("📥 Preparing email data...");
-    
-    // Fallback for itemId
-    let itemId = item.itemId;
-    if (!itemId) {
-        console.log("ℹ️ Using temporary ID since itemId isn't available in this context");
-        itemId = `temp-${emailId}`;
+async function processAttachment(attachment, itemId) {
+    if (!attachment || !attachment.id) {
+        console.warn("⚠️ Invalid attachment object:", attachment);
+        return null;
     }
 
-    const processedAttachments = item.attachments || [];
-    console.log("📎 Attachments Received for Processing:", processedAttachments);
-
-    // Process attachments with error handling
-    const attachmentPayloads = [];
-    for (const attachment of attachments) {
-        if (!attachment || !attachment.id) {
-            console.warn("⚠️ Skipping invalid attachment:", attachment);
-            continue;
-        }
-
-        try {
-            let base64Data;
-            // Try fallback method first since Graph API requires itemId
-            try {
-                base64Data = await getAttachmentBase64Fallback(attachment);
-            } catch (fallbackError) {
-                console.warn("⚠️ Fallback method failed, trying Graph API:", fallbackError);
-                if (itemId && !itemId.startsWith('temp-')) {
-                    base64Data = await fetchAttachmentBase64UsingGraph(itemId, attachment.id);
-                } else {
-                    throw new Error("Cannot use Graph API without proper itemId");
+    try {
+        // Try Office.js method first
+        const content = await new Promise((resolve, reject) => {
+            Office.context.mailbox.item.getAttachmentContentAsync(
+                attachment.id,
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        if (result.value.format === Office.MailboxEnums.AttachmentContentFormat.Base64) {
+                            resolve(result.value.content);
+                        } else {
+                            reject(new Error("Attachment not in Base64 format"));
+                        }
+                    } else {
+                        reject(result.error);
+                    }
                 }
-            }
+            );
+        });
 
-            attachmentPayloads.push({
-                id: generateUUID(),
-                fileName: attachment.name || 'Unknown',
-                fileSize: attachment.size || 0,
-                fileType: attachment.attachmentType || 'application/octet-stream',
-                uploadTime: new Date().toISOString(),
-                fileData: base64Data,
-            });
-        } catch (err) {
-            console.error(`❌ Error processing attachment: ${attachment.name}`, err);
-            // Continue with other attachments even if one fails
-        }
+        return {
+            id: generateUUID(),
+            fileName: attachment.name || 'Unknown',
+            fileSize: attachment.size || 0,
+            fileType: attachment.attachmentType || 'application/octet-stream',
+            uploadTime: new Date().toISOString(),
+            fileData: content
+        };
+    } catch (error) {
+        console.error(`❌ Failed to process attachment ${attachment.name}:`, error);
+        return null;
+    }
+}
+async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
+    const emailId = generateUUID();
+    console.log("📥 Preparing email data with ID:", emailId);
+
+    // Process attachments in parallel with error handling
+    const attachmentPromises = (attachments || []).map(att => 
+        processAttachment(att, Office.context.mailbox.item.itemId)
+    );
+    
+    const attachmentResults = await Promise.all(attachmentPromises);
+    const validAttachments = attachmentResults.filter(att => att !== null && att.fileData);
+
+    if (attachmentResults.length !== validAttachments.length) {
+        console.warn(`⚠️ ${attachmentResults.length - validAttachments.length} attachments failed processing`);
     }
 
-    // Validate required fields
-    if (!from) {
-        throw new Error("From address is required");
+    // Validate we have at least one valid recipient
+    const allRecipients = [
+        ...(to ? to.split(',').map(e => e.trim()).filter(e => e) : []),
+        ...(cc ? cc.split(',').map(e => e.trim()).filter(e => e) : []),
+        ...(bcc ? bcc.split(',').map(e => e.trim()).filter(e => e) : [])
+    ];
+
+    if (allRecipients.length === 0) {
+        throw new Error("No valid recipients specified");
     }
 
     return {
         id: emailId,
-        fromEmailID: from,
+        fromEmailID: from || "",
         emailTo: to ? to.split(',').map(e => e.trim()).filter(e => e) : [],
         emailCc: cc ? cc.split(',').map(e => e.trim()).filter(e => e) : [],
         emailBcc: bcc ? bcc.split(',').map(e => e.trim()).filter(e => e) : [],
         emailSubject: subject || "(No Subject)",
         emailBody: body || "",
         timestamp: new Date().toISOString(),
-        attachments: attachmentPayloads,
+        attachments: validAttachments,
+        warnings: attachmentResults.length !== validAttachments.length ? 
+            `${attachmentResults.length - validAttachments.length} attachments failed` : undefined
     };
 }
 
