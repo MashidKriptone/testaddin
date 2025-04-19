@@ -200,30 +200,41 @@ async function onMessageSendHandler(eventArgs) {
 
         // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
-            console.log("🔐 Encrypting email...");
+            console.log("🔐 Beginning encryption process...");
+            
             try {
                 const encryptedResult = await getEncryptedEmail(emailData, token);
                 
-                if (!encryptedResult) {
-                    throw new Error("No response from encryption service");
+                // Additional validation of encrypted result
+                if (!encryptedResult?.encryptedFile) {
+                    throw new Error("Encryption service returned invalid data");
                 }
 
-                console.log("ℹ️ Encryption result received");
+                console.log("ℹ️ Encryption result validated:", {
+                    dataLength: encryptedResult.encryptedFile.length,
+                    fileName: encryptedResult.fileName
+                });
+
                 await updateEmailWithEncryptedContent(item, encryptedResult);
-                
-                console.log("✅ Email prepared with encryption");
                 eventArgs.completed({ allowEvent: true });
                 return;
-            } catch (error) {
-                console.error("❌ Encryption failed:", error);
-                await showOutlookNotification(
-                    "Encryption Error", 
-                    "Failed to encrypt email. Please try again or contact support."
-                );
+                
+            } catch (encryptionError) {
+                console.error("❌ Encryption process failed:", encryptionError);
+                
+                let userMessage = "Failed to secure email. ";
+                if (encryptionError.message.includes("null") || encryptionError.message.includes("base64")) {
+                    userMessage += "Attachment processing failed. Please remove attachments and try again.";
+                } else {
+                    userMessage += "Please try again or contact support.";
+                }
+                
+                await showOutlookNotification("Encryption Failed", userMessage);
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
         }
+
 
         // 13. If no encryption needed, just save the email data
         console.log('💾 Saving email data...');
@@ -334,49 +345,67 @@ function checkAttachments(attachments, blockedTypes = []) {
  * Updates the email with encrypted content
  */
 async function updateEmailWithEncryptedContent(item, encryptedResult) {
-    // Update body with instructions
-    await new Promise((resolve, reject) => {
-        item.body.setAsync(
-            encryptedResult.instructionNote || 
-            "This email is secured. Please use the attached file to view the content.",
-            { coercionType: Office.CoercionType.Html },
-            (result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    resolve();
-                } else {
-                    reject(result.error);
-                }
-            }
-        );
-    });
-
-    // Remove existing attachments
-    const attachments = await new Promise((resolve) => {
-        item.getAttachmentsAsync(resolve);
-    });
-
-    if (attachments.value?.length > 0) {
-        await Promise.all(attachments.value.map(att => 
-            new Promise((resolve) => {
-                item.removeAttachmentAsync(att.id, resolve);
-            })
-        ));
+    // Validate encrypted result before proceeding
+    if (!encryptedResult?.encryptedFile) {
+        throw new Error("Invalid encrypted content received");
     }
 
-    // Add encrypted attachment
-    await new Promise((resolve, reject) => {
-        item.addFileAttachmentFromBase64Async(
-            encryptedResult.encryptedFile,
-            encryptedResult.fileName || "secure-message.ksf",
-            (result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    resolve();
-                } else {
-                    reject(result.error);
+    try {
+        // Step 1: Update email body
+        await new Promise((resolve, reject) => {
+            item.body.setAsync(
+                encryptedResult.instructionNote,
+                { coercionType: Office.CoercionType.Html },
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to update body: ${result.error.message}`));
+                    }
                 }
+            );
+        });
+
+        // Step 2: Remove existing attachments
+        const attachments = await new Promise(resolve => {
+            item.getAttachmentsAsync(resolve);
+        });
+
+        if (attachments.value?.length > 0) {
+            await Promise.all(attachments.value.map(att => 
+                new Promise(resolve => {
+                    item.removeAttachmentAsync(att.id, resolve);
+                })
+            ));
+        }
+
+        // Step 3: Add encrypted attachment with validation
+        await new Promise((resolve, reject) => {
+            if (!encryptedResult.encryptedFile) {
+                reject(new Error("Cannot add attachment - encryptedFile is null"));
+                return;
             }
-        );
-    });
+
+            item.addFileAttachmentFromBase64Async(
+                encryptedResult.encryptedFile,
+                encryptedResult.fileName || "secure-message.ksf",
+                { isInline: false },
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to add attachment: ${result.error.message}`));
+                    }
+                }
+            );
+        });
+
+        console.log("✅ Email successfully updated with encrypted content");
+        
+    } catch (error) {
+        console.error("❌ Failed to update email with encrypted content:", error);
+        throw error;
+    }
 }
 // Get user details from Microsoft Graph
 async function getUserDetails(accessToken) {
@@ -443,36 +472,39 @@ async function getEncryptedEmail(emailDataDto, token) {
                 "Authorization": `Bearer ${token}`,
                 "X-Tenant-ID": "kriptone.com"
             },
-            body: JSON.stringify({
-                ...emailDataDto,
-                // Ensure we're not sending excessively large attachments
-                attachments: emailDataDto.attachments.map(att => ({
-                    ...att,
-                    fileData: att.fileData.length > 1000000 ? "[LARGE_FILE_TRUNCATED]" : att.fileData
-                }))
-            })
+            body: JSON.stringify(emailDataDto)
         });
 
         if (!response.ok) {
             let errorDetails;
             try {
-                // Try to get the error response as JSON first
                 errorDetails = await response.json();
             } catch (e) {
-                // Fall back to text if JSON parsing fails
                 errorDetails = await response.text();
             }
-
+            
             console.error("🔴 API Error Response:", {
                 status: response.status,
-                url: response.url,
                 errorDetails
             });
-
-            throw new Error(`Email encryption failed: ${response.status} - ${JSON.stringify(errorDetails)}`);
+            
+            throw new Error(`Encryption failed with status ${response.status}`);
         }
 
-        return await response.json();
+        const responseData = await response.json();
+        
+        // Validate the response contains required fields
+        if (!responseData.encryptedFile) {
+            throw new Error("API response missing required encryptedFile field");
+        }
+
+        return {
+            encryptedFile: responseData.encryptedFile,
+            fileName: responseData.fileName || "secure-message.ksf",
+            instructionNote: responseData.instructionNote || 
+                "This email is secured. Please use the attached file to view the content."
+        };
+
     } catch (error) {
         console.error("❌ Full encryption error details:", {
             error: error.message,
@@ -531,41 +563,22 @@ function isDomainBlocked(recipients, blockedDomains) {
     return false;
 }
 async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
-    let emailId = generateUUID();
-    const item = Office.context.mailbox.item;
+    const emailId = generateUUID();
+    console.log("📥 Preparing email data with ID:", emailId);
 
-    console.log("📥 Preparing email data...");
-    
-    // Fallback for itemId
-    let itemId = item.itemId;
-    if (!itemId) {
-        console.log("ℹ️ Using temporary ID since itemId isn't available in this context");
-        itemId = `temp-${emailId}`;
-    }
-
-    const processedAttachments = item.attachments || [];
-    console.log("📎 Attachments Received for Processing:", processedAttachments);
-
-    // Process attachments with error handling
+    // Process attachments with strict validation
     const attachmentPayloads = [];
-    for (const attachment of attachments) {
+    for (const attachment of attachments || []) {
         if (!attachment || !attachment.id) {
             console.warn("⚠️ Skipping invalid attachment:", attachment);
             continue;
         }
 
         try {
-            let base64Data;
-            // Try fallback method first since Graph API requires itemId
-            try {
-                base64Data = await getAttachmentBase64Fallback(attachment);
-            } catch (fallbackError) {
-                console.warn("⚠️ Fallback method failed, trying Graph API:", fallbackError);
-                if (itemId && !itemId.startsWith('temp-')) {
-                    base64Data = await fetchAttachmentBase64UsingGraph(itemId, attachment.id);
-                } else {
-                    throw new Error("Cannot use Graph API without proper itemId");
-                }
+            const base64Data = await getAttachmentBase64Fallback(attachment);
+            
+            if (!base64Data) {
+                throw new Error("Attachment returned empty data");
             }
 
             attachmentPayloads.push({
@@ -574,29 +587,35 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
                 fileSize: attachment.size || 0,
                 fileType: attachment.attachmentType || 'application/octet-stream',
                 uploadTime: new Date().toISOString(),
-                fileData: base64Data,
+                fileData: base64Data
             });
-        } catch (err) {
-            console.error(`❌ Error processing attachment: ${attachment.name}`, err);
-            // Continue with other attachments even if one fails
+        } catch (error) {
+            console.error(`❌ Failed to process attachment ${attachment.name}:`, error);
+            throw new Error(`Could not process attachment ${attachment.name}`);
         }
     }
 
-    // Validate required fields
-    if (!from) {
-        throw new Error("From address is required");
+    // Validate we have at least one valid recipient
+    const allRecipients = [
+        ...(to ? to.split(',').map(e => e.trim()).filter(e => e) : []),
+        ...(cc ? cc.split(',').map(e => e.trim()).filter(e => e) : []),
+        ...(bcc ? bcc.split(',').map(e => e.trim()).filter(e => e) : [])
+    ];
+
+    if (allRecipients.length === 0) {
+        throw new Error("No valid recipients specified");
     }
 
     return {
         id: emailId,
-        fromEmailID: from,
+        fromEmailID: from || "",
         emailTo: to ? to.split(',').map(e => e.trim()).filter(e => e) : [],
         emailCc: cc ? cc.split(',').map(e => e.trim()).filter(e => e) : [],
         emailBcc: bcc ? bcc.split(',').map(e => e.trim()).filter(e => e) : [],
         emailSubject: subject || "(No Subject)",
         emailBody: body || "",
         timestamp: new Date().toISOString(),
-        attachments: attachmentPayloads,
+        attachments: attachmentPayloads
     };
 }
 
