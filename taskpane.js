@@ -325,10 +325,14 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
 const item = Office.context.mailbox.item;
 
 console.log("📥 Preparing email data...");
-
+let itemId;
 // Step 1: Save item and get itemId
-const itemId = await saveItemAndGetId();
-
+try {
+    itemId = await saveItemAndGetId(item);
+} catch (error) {
+    console.error("❌ Failed to get itemId:", error);
+    // You can handle fallback logic here
+}
 // Step 2: Get attachments
 const processedAttachments  = item.attachments || [];
 console.log("📎 Attachments Received for Processing:", processedAttachments );
@@ -372,19 +376,30 @@ return {
 };
 }
 
-async function saveItemAndGetId() {
+function saveItemAndGetId(item, retries = 5, delay = 1000) {
     return new Promise((resolve, reject) => {
-      Office.context.mailbox.item.saveAsync((result) => {
-        if (result.status === Office.AsyncResultStatus.Succeeded) {
-          const id = Office.context.mailbox.item.itemId;
-          if (!id) return reject("Item ID still null after save.");
-          resolve(id);
-        } else {
-          reject("Error saving item to get ID.");
+        function attemptSave(attempt) {
+            item.saveAsync((asyncResult) => {
+                if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+                    const id = item.itemId;
+                    if (id) {
+                        console.log("✅ Got itemId after save:", id);
+                        resolve(id);
+                    } else if (attempt < retries) {
+                        console.warn(`⏳ itemId still null, retrying (${attempt + 1}/${retries})...`);
+                        setTimeout(() => attemptSave(attempt + 1), delay);
+                    } else {
+                        reject(new Error("Item ID still null after save."));
+                    }
+                } else {
+                    reject(asyncResult.error);
+                }
+            });
         }
-      });
+        attemptSave(0);
     });
-  }
+}
+
   
 async function fetchAttachmentBase64UsingGraph(itemId, attachmentId) {
     const accessToken = await getAccessToken(); // Use MSAL or SSO
