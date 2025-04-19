@@ -317,109 +317,100 @@ function isDomainBlocked(recipients, blockedDomains) {
     }
     return false;
 }
-
 async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
     let emailId = generateUUID();
+const item = Office.context.mailbox.item;
 
-    console.log("📎 Attachments Received for Processing:", attachments);
-    attachments.forEach(att => console.log("🔎 Checking attachment ID:", att?.id));
-    const attachmentPayloads = await Promise.all(
-        
-        attachments.map(async (attachment) => {
-            if (!attachment || !attachment.id) {
-                console.warn("⚠️ Skipping invalid attachment:", attachment);
-                return null;
-            }
+console.log("📥 Preparing email data...");
 
-            let fileData = null;
-            try {
-                fileData = await getAttachmentBase64(attachment.id);
-            } catch (error) {
-                console.error(`❌ Error getting base64 for attachment: ${attachment.name}`, error);
-                return null;
-            }
+// Step 1: Save item and get itemId
+const itemId = await saveItemAndGetId();
 
-            return {
-                Id: generateUUID(),
-                FileName: attachment.name || 'Unknown',
-                FileType: attachment.attachmentType || 'application/octet-stream',
-                FileSize: attachment.size || 0,
-                UploadTime: new Date().toISOString(),
-                FileData: fileData,
-            };
-        })
-    );
+// Step 2: Get attachments
+const attachments = item.attachments || [];
+console.log("📎 Attachments Received for Processing:", attachments);
 
-    return {
-        Id: emailId,
-        FromEmailID: from,
-        Attachments: attachmentPayloads.filter(att => att !== null),
-        EmailBcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
-        EmailCc: cc ? cc.split(',').map(email => email.trim()) : [],
-        EmailBody: body,
-        EmailSubject: subject,
-        EmailTo: to ? to.split(',').map(email => email.trim()) : [],
-        Timestamp: new Date().toISOString(),
-    };
-}
-
-
-function getAttachmentBase64(attachmentId) {
-    return new Promise((resolve, reject) => {
-        if (!attachmentId) {
-            console.error("❌ Invalid attachmentId:", attachmentId);
-            return reject("Attachment ID is null or undefined");
-        }
-
-        Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
-            if (result.status === "succeeded") {
-                const token = result.value;
-                
-                const itemId = Office.context.mailbox.convertToRestId(
-                    Office.context.mailbox.item.itemId,
-                    Office.MailboxEnums.RestVersion.v2_0
-                );
-
-                const url = `${Office.context.mailbox.restUrl}/v2.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
-
-                fetch(url, {
-                    method: "GET",
-                    headers: {
-                        Authorization: "Bearer " + token,
-                        Accept: "application/json; odata.metadata=none"
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error("Failed to fetch attachment data: " + response.status);
-                    }
-                    return response.arrayBuffer();
-                })
-                .then(arrayBuffer => {
-                    const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                    resolve(base64String);
-                })
-                .catch(err => {
-                    console.error("❌ Fetch error:", err);
-                    reject(err);
-                });
-            } else {
-                console.error("❌ Failed to get token", result.error);
-                reject(result.error);
-            }
-        });
-    });
-}
-
-function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+const attachmentPayloads = await Promise.all(
+  attachments.map(async (attachment) => {
+    if (!attachment || !attachment.id) {
+      console.warn("⚠️ Skipping invalid attachment:", attachment);
+      return null;
     }
-    return btoa(binary);
+
+    try {
+      const base64Data = await fetchAttachmentBase64UsingGraph(itemId, attachment.id);
+      return {
+        id: generateUUID(),
+        fileName: attachment.name || 'Unknown',
+        fileSize: attachment.size || 0,
+        fileType: attachment.attachmentType || 'application/octet-stream',
+        uploadTime: new Date().toISOString(),
+        fileData: base64Data,
+       
+      };
+    } catch (err) {
+      console.error(`❌ Error getting base64 for attachment: ${attachment.name}`, err);
+      return null;
+    }
+  })
+);
+
+return {
+  id: emailId,
+  fromEmailID: from,
+//   email: from,
+  emailTo: to ? to.split(',').map(e => e.trim()) : [],
+  emailCc: cc ? cc.split(',').map(e => e.trim()) : [],
+  emailBcc: bcc ? bcc.split(',').map(e => e.trim()) : [],
+  emailSubject: subject,
+  emailBody: body,
+  timestamp: new Date().toISOString(),
+  attachments: attachmentPayloads.filter(a => a !== null),
+};
 }
+
+async function saveItemAndGetId() {
+    return new Promise((resolve, reject) => {
+      Office.context.mailbox.item.saveAsync((result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          const id = Office.context.mailbox.item.itemId;
+          if (!id) return reject("Item ID still null after save.");
+          resolve(id);
+        } else {
+          reject("Error saving item to get ID.");
+        }
+      });
+    });
+  }
+  
+async function fetchAttachmentBase64UsingGraph(itemId, attachmentId) {
+    const accessToken = await getAccessToken(); // Use MSAL or SSO
+    const url = `https://graph.microsoft.com/v1.0/me/messages/${itemId}/attachments/${attachmentId}/$value`;
+  
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+  
+    if (!response.ok) {
+      throw new Error(`Failed to fetch attachment data: ${response.status}`);
+    }
+  
+    const blob = await response.blob();
+    return await blobToBase64(blob);
+  }
+  
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]); // Remove base64 prefix
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  
 
 
 function generateUUID() {
