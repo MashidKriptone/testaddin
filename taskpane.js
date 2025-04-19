@@ -200,27 +200,32 @@ async function onMessageSendHandler(eventArgs) {
 
         // Handle encryption
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
+            console.log("🔐 Beginning encryption process...");
+            
             try {
-                console.log("🔐 Attempting encryption...");
                 const encryptedResult = await getEncryptedEmail(emailData, token);
-                
-                if (!encryptedResult?.encryptedFile) {
-                    throw new Error("Invalid response from encryption service");
-                }
+                console.log("ℹ️ Encryption response received:", {
+                    encryptedFile: encryptedResult.encryptedFile ? `[data: ${encryptedResult.encryptedFile.length} chars]` : null,
+                    fileName: encryptedResult.fileName,
+                    instructionNote: encryptedResult.instructionNote.substring(0, 50) + '...'
+                });
 
                 await updateEmailWithEncryptedContent(item, encryptedResult);
+                console.log(`⏱️ Encryption completed in ${Date.now() - startTime}ms`);
+                
                 eventArgs.completed({ allowEvent: true });
                 return;
                 
-            } catch (error) {
-                console.error("❌ Encryption failed:", error);
+            } catch (encryptionError) {
+                console.error("❌ Encryption process failed:", encryptionError);
                 
-                let userMessage = "Failed to encrypt email. ";
-                if (error.message.includes("null") || error.message.includes("base64")) {
-                    userMessage += "Attachment processing failed. Please remove attachments and try again.";
-                } else {
-                    userMessage += "Please try again or contact support.";
+                let userMessage = "Failed to secure email. ";
+                if (encryptionError.message.includes("Invalid response")) {
+                    userMessage += "The encryption service returned an invalid response. ";
+                } else if (encryptionError.message.includes("timeout")) {
+                    userMessage += "The encryption service timed out. ";
                 }
+                userMessage += "Please try again or contact support.";
                 
                 await showOutlookNotification("Encryption Failed", userMessage);
                 eventArgs.completed({ allowEvent: false });
@@ -257,7 +262,23 @@ async function onMessageSendHandler(eventArgs) {
         console.log(`⏱️ Handler completed in ${Date.now() - startTime}ms`);
     }
 }
-
+function validateEncryptionResponse(response) {
+    if (!response) {
+        throw new Error("Empty response from encryption service");
+    }
+    
+    // Check for required fields in successful response
+    if (!response.encryptedFile) {
+        throw new Error("Missing encryptedFile in response");
+    }
+    
+    if (!response.instructionNote) {
+        console.warn("⚠️ No instruction note provided in response");
+        response.instructionNote = "This email is secured. Please use the attached file to view the content.";
+    }
+    
+    return response;
+}
 // Helper Functions
 
 /**
@@ -337,49 +358,57 @@ function checkAttachments(attachments, blockedTypes = []) {
  * Updates the email with encrypted content
  */
 async function updateEmailWithEncryptedContent(item, encryptedResult) {
-    // Update body with instructions
-    await new Promise((resolve, reject) => {
-        item.body.setAsync(
-            encryptedResult.instructionNote || 
-            "This email is secured. Please use the attached file to view the content.",
-            { coercionType: Office.CoercionType.Html },
-            (result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    resolve();
-                } else {
-                    reject(result.error);
+    try {
+        // Step 1: Update email body
+        await new Promise((resolve, reject) => {
+            item.body.setAsync(
+                encryptedResult.instructionNote,
+                { coercionType: Office.CoercionType.Html },
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to update body: ${result.error.message}`));
+                    }
                 }
-            }
-        );
-    });
+            );
+        });
 
-    // Remove existing attachments
-    const attachments = await new Promise((resolve) => {
-        item.getAttachmentsAsync(resolve);
-    });
+        // Step 2: Remove existing attachments
+        const attachments = await new Promise(resolve => {
+            item.getAttachmentsAsync(resolve);
+        });
 
-    if (attachments.value?.length > 0) {
-        await Promise.all(attachments.value.map(att => 
-            new Promise((resolve) => {
-                item.removeAttachmentAsync(att.id, resolve);
-            })
-        ));
+        if (attachments.value?.length > 0) {
+            await Promise.all(attachments.value.map(attachment => 
+                new Promise(resolve => {
+                    item.removeAttachmentAsync(attachment.id, resolve);
+                })
+            ));
+        }
+
+        // Step 3: Add encrypted attachment
+        await new Promise((resolve, reject) => {
+            item.addFileAttachmentFromBase64Async(
+                encryptedResult.encryptedFile,
+                encryptedResult.fileName || "secure-message.ksf",
+                { isInline: false },
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to add attachment: ${result.error.message}`));
+                    }
+                }
+            );
+        });
+
+        console.log("✅ Email successfully updated with encrypted content");
+        
+    } catch (error) {
+        console.error("❌ Failed to update email with encrypted content:", error);
+        throw new Error(`Failed to update email: ${error.message}`);
     }
-
-    // Add encrypted attachment
-    await new Promise((resolve, reject) => {
-        item.addFileAttachmentFromBase64Async(
-            encryptedResult.encryptedFile,
-            encryptedResult.fileName || "secure-message.ksf",
-            (result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    resolve();
-                } else {
-                    reject(result.error);
-                }
-            }
-        );
-    });
 }
 // Get user details from Microsoft Graph
 async function getUserDetails(accessToken) {
@@ -431,20 +460,14 @@ async function fetchPolicyDomains(token) {
 }
 
 async function getEncryptedEmail(emailData, token) {
-    // Validate all required fields
-    if (!emailData.fromEmailID || !emailRegex.test(emailData.fromEmailID)) {
-        throw new Error("Invalid sender email address");
-    }
-
-    // Ensure all attachments have valid base64 data
-    const validatedAttachments = emailData.attachments.map(att => {
-        if (!att.fileData) {
-            throw new Error(`Attachment ${att.fileName} has no file data`);
-        }
-        return att;
-    });
-
     try {
+        console.log("🔐 Sending data for encryption:", {
+            emailId: emailData.id,
+            from: emailData.fromEmailID,
+            subject: emailData.emailSubject.substring(0, 30) + (emailData.emailSubject.length > 30 ? "..." : ""),
+            attachmentCount: emailData.attachments.length
+        });
+
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
@@ -452,32 +475,38 @@ async function getEncryptedEmail(emailData, token) {
                 "Authorization": `Bearer ${token}`,
                 "X-Tenant-ID": "kriptone.com"
             },
-            body: JSON.stringify({
-                ...emailData,
-                attachments: validatedAttachments
-            })
+            body: JSON.stringify(emailData),
+            timeout: 30000 // 30 seconds timeout
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API responded with ${response.status}: ${errorText}`);
+            const errorBody = await response.text();
+            console.error("🔴 Encryption API error:", {
+                status: response.status,
+                statusText: response.statusText,
+                errorBody
+            });
+            throw new Error(`Encryption failed with status ${response.status}`);
         }
 
-        return await response.json();
+        const responseData = await response.json();
+        return validateEncryptionResponse(responseData);
+        
     } catch (error) {
-        console.error("Encryption API error:", {
+        console.error("❌ Full encryption error details:", {
             error: error.message,
-            request: {
-                from: emailData.fromEmailID,
-                subject: emailData.emailSubject,
-                attachmentCount: emailData.attachments.length,
-                firstAttachment: emailData.attachments[0] ? {
-                    name: emailData.attachments[0].fileName,
-                    dataLength: emailData.attachments[0].fileData.length
-                } : null
+            stack: error.stack,
+            requestData: {
+                ...emailData,
+                attachments: emailData.attachments.map(att => ({
+                    fileName: att.fileName,
+                    size: att.fileSize,
+                    type: att.fileType,
+                    dataLength: att.fileData?.length || 0
+                }))
             }
         });
-        throw error;
+        throw new Error(`Encryption service error: ${error.message}`);
     }
 }
 async function saveEmailData(emailData,token) {
