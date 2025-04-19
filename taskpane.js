@@ -475,28 +475,28 @@ async function getEncryptedEmail(emailDataDto, token) {
         throw error;
     }
 }
-// async function saveEmailData(emailData,token) {
-//     try {
-//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
-//             body: JSON.stringify(emailData),
-//         });
+async function saveEmailData(emailData,token) {
+    try {
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+            body: JSON.stringify(emailData),
+        });
 
-//         const json = await response.json();
+        const json = await response.json();
 
-//         return {
-//             success: response.ok && json.success,
-//             message: json.message || "Unknown error",
-//         };
-//     } catch (error) {
-//         console.error("❌ Error saving email data:", error);
-//         return {
-//             success: false,
-//             message: "Unable to connect to the server. Please try again later.",
-//         };
-//     }
-// }
+        return {
+            success: response.ok && json.success,
+            message: json.message || "Unknown error",
+        };
+    } catch (error) {
+        console.error("❌ Error saving email data:", error);
+        return {
+            success: false,
+            message: "Unable to connect to the server. Please try again later.",
+        };
+    }
+}
 
 // Helper functions
 function validateEmailAddresses(recipients) {
