@@ -366,7 +366,7 @@ async function updateEmailWithEncryptedContent(item, encryptedResult) {
     // Add encrypted attachment
     await new Promise((resolve, reject) => {
         item.addFileAttachmentFromBase64Async(
-            encryptedResult.encryptedFile,
+            encryptedResult.fileData,
             encryptedResult.fileName || "secure-message.ksf",
             (result) => {
                 if (result.status === Office.AsyncResultStatus.Succeeded) {
