@@ -344,17 +344,12 @@ function checkAttachments(attachments, blockedTypes = []) {
 /**
  * Updates the email with encrypted content
  */
-async function updateEmailWithEncryptedContent(item, encryptedResult) {
-    // Validate encrypted result before proceeding
-    if (!encryptedResult?.encryptedFile) {
-        throw new Error("Invalid encrypted content received");
-    }
-
+async function updateEmailWithEncryptedContent(item, apiResponse) {
     try {
-        // Step 1: Update email body
+        // 1. Update email body
         await new Promise((resolve, reject) => {
             item.body.setAsync(
-                encryptedResult.instructionNote,
+                apiResponse.instructionNote,
                 { coercionType: Office.CoercionType.Html },
                 (result) => {
                     if (result.status === Office.AsyncResultStatus.Succeeded) {
@@ -366,39 +361,59 @@ async function updateEmailWithEncryptedContent(item, encryptedResult) {
             );
         });
 
-        // Step 2: Remove existing attachments (only if there are any)
-        const attachments = await new Promise(resolve => {
+        // 2. Remove existing attachments
+        const currentAttachments = await new Promise(resolve => {
             item.getAttachmentsAsync(resolve);
         });
 
-        if (attachments.value?.length > 0) {
-            await Promise.all(attachments.value.map(att => 
+        if (currentAttachments.value?.length > 0) {
+            await Promise.all(currentAttachments.value.map(att => 
                 new Promise(resolve => {
                     item.removeAttachmentAsync(att.id, resolve);
                 })
             ));
         }
 
-        // Step 3: Add encrypted attachment with validation
-        await new Promise((resolve, reject) => {
-            item.addFileAttachmentFromBase64Async(
-                encryptedResult.encryptedFile,
-                encryptedResult.fileName || "secure-message.ksf",
-                { isInline: false },
-                (result) => {
-                    if (result.status === Office.AsyncResultStatus.Succeeded) {
-                        resolve();
-                    } else {
-                        reject(new Error(`Failed to add attachment: ${result.error.message}`));
-                    }
-                }
-            );
-        });
+        // 3. Add new attachments with validation
+        if (!apiResponse.encryptedAttachments || apiResponse.encryptedAttachments.length === 0) {
+            console.warn("No attachments in API response");
+            return;
+        }
 
-        console.log("✅ Email successfully updated with encrypted content");
-        
+        for (const attachment of apiResponse.encryptedAttachments) {
+            if (!attachment.fileData || typeof attachment.fileData !== 'string') {
+                console.error("Invalid attachment data:", attachment);
+                continue;
+            }
+
+            // Clean the Base64 string if needed
+            const cleanBase64 = attachment.fileData.replace(/^data:[^;]+;base64,/, '');
+
+            await new Promise((resolve, reject) => {
+                item.addFileAttachmentFromBase64Async(
+                    cleanBase64,
+                    attachment.fileName || "secure-file.ksf",
+                    { isInline: false },
+                    (result) => {
+                        if (result.status === Office.AsyncResultStatus.Succeeded) {
+                            console.log(`✅ Added attachment: ${attachment.fileName}`);
+                            resolve();
+                        } else {
+                            console.error(`❌ Failed to add attachment ${attachment.fileName}:`, result.error);
+                            reject(new Error(`Failed to add attachment ${attachment.fileName}: ${result.error.message}`));
+                        }
+                    }
+                );
+            });
+        }
+
+        console.log("✅ Email successfully updated with secure content");
     } catch (error) {
-        console.error("❌ Failed to update email with encrypted content:", error);
+        console.error("❌ Failed to update email:", {
+            error: error.message,
+            stack: error.stack,
+            apiResponse: apiResponse
+        });
         throw error;
     }
 }
