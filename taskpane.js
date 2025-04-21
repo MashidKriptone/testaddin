@@ -181,16 +181,31 @@ async function onMessageSendHandler(eventArgs) {
        let emailData;
         try {
             emailData = await prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
-            console.log("ℹ️ Prepared email data structure:", {
-                id: emailData.id,
-                from: emailData.fromEmailID,
-                toCount: emailData.emailTo.length,
-                ccCount: emailData.emailCc.length,
-                bccCount: emailData.emailBcc.length,
-                subjectLength: emailData.emailSubject.length,
-                bodyLength: emailData.emailBody.length,
-                attachmentCount: emailData.attachments.length
-            });
+            // Detailed payload logging
+        console.group('📤 Email Data Payload');
+        console.log('📝 Basic Info:', {
+            id: emailData.id,
+            from: emailData.fromEmailID,
+            timestamp: emailData.timestamp,
+            subject: emailData.emailSubject,
+            bodyLength: emailData.emailBody.length
+        });
+        
+        console.log('👥 Recipients:', {
+            to: emailData.emailTo,
+            cc: emailData.emailCc,
+            bcc: emailData.emailBcc
+        });
+        
+        console.log('📎 Attachments:', emailData.attachments.map(att => ({
+            name: att.fileName,
+            size: att.fileSize,
+            type: att.fileType,
+            dataPreview: att.fileData?.substring(0, 50) + '...'
+        })));
+        
+        console.log('🔢 Full Payload Size:', JSON.stringify(emailData).length, 'bytes');
+        console.groupEnd();
         } catch (error) {
             console.error("Error preparing email data:", error);
             await showOutlookNotification("Error", "Failed to prepare email for sending");
@@ -502,7 +517,26 @@ async function getEncryptedEmail(emailDataDto, token) {
         }
 
         const responseData = await response.json();
-        
+         // Detailed response logging
+         console.group('📥 API Response Details');
+         console.log('🔑 Response Metadata:', {
+             responseSize: JSON.stringify(responseData).length + ' bytes',
+             hasAttachments: !!responseData.encryptedAttachments,
+             attachmentCount: responseData.encryptedAttachments?.length || 0
+         });
+         
+         if (responseData.encryptedAttachments) {
+             console.log('📎 Attachments Received:', responseData.encryptedAttachments.map(att => ({
+                 name: att.fileName,
+                 type: att.fileType,
+                 size: att.fileData?.length || 'unknown',
+                 dataPreview: att.fileData?.substring(0, 30) + '...'
+             })));
+         }
+         
+         console.log('📝 Instruction Note Preview:', responseData.instructionNote?.substring(0, 100) + '...');
+         console.log('🔄 Full Response:', responseData);
+         console.groupEnd();
         // Validate the response contains required fields
         if (!responseData.encryptedAttachments || responseData.encryptedAttachments.length === 0) {
             throw new Error("API response missing required encrypted attachments");
@@ -544,7 +578,7 @@ async function saveEmailData(emailData,token) {
         });
 
         const json = await response.json();
-
+        console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
         return {
             success: response.ok && json.success,
             message: json.message || "Unknown error",
