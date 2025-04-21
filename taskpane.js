@@ -517,7 +517,7 @@ async function getEncryptedEmail(emailDataDto, token) {
         }
 
         const responseData = await response.json();
-        console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
+        console.log("🔹 Raw API Response:", JSON.stringify(responseData, null, 2));
          // Detailed response logging
          console.group('📥 API Response Details');
          console.log('🔑 Response Metadata:', {
