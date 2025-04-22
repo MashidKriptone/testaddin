@@ -36,6 +36,7 @@ async function onMessageSendHandler(eventArgs) {
     console.log('🚀 onMessageSendHandler started at:', new Date().toISOString());
     
     try {
+        showLoader();
         // 1. Initialize MSAL if not already done
         if (!isInitialized) {
             console.log('⚙️ Initializing MSAL...');
@@ -277,6 +278,7 @@ async function onMessageSendHandler(eventArgs) {
         );
         eventArgs.completed({ allowEvent: false });
     } finally {
+        hideLoader();
         console.log(`⏱️ Handler completed in ${Date.now() - startTime}ms`);
     }
 }
@@ -912,4 +914,14 @@ async function fetchEmails(token) {
         console.error("Error fetching emails:", error);
         throw error;
     }
+}
+
+function showLoader() {
+    const loader = document.getElementById("loader");
+    if (loader) loader.style.display = "flex";
+}
+
+function hideLoader() {
+    const loader = document.getElementById("loader");
+    if (loader) loader.style.display = "none";
 }
