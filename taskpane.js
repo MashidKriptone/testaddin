@@ -408,14 +408,16 @@ async function updateEmailWithEncryptedContent(item, apiResponse) {
 
             await new Promise((resolve, reject) => {
                 item.addFileAttachmentFromBase64Async(
-                    apiResponse.encryptedFile,
-                    apiResponse.fileName || "secure-message.ksf",
+                    cleanBase64,
+                    fileName,
                     { isInline: false },
                     (result) => {
                         if (result.status === Office.AsyncResultStatus.Succeeded) {
+                            console.log(`✅ Added attachment: ${attachment.fileName}`);
                             resolve();
                         } else {
-                            reject(new Error(`Failed to add attachment: ${result.error.message}`));
+                            console.error(`❌ Failed to add attachment ${attachment.fileName}:`, result.error);
+                            reject(new Error(`Failed to add attachment ${attachment.fileName}: ${result.error.message}`));
                         }
                     }
                 );
