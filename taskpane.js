@@ -54,7 +54,6 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        await showProgress("Step 1 of 4", "Checking email policy...");
         
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
@@ -146,7 +145,6 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-        await showProgress("Step 2 of 4", "Validating email contents...");
         
         // 9. Content scanning if enabled
         if (policy?.contentScanning) {
@@ -177,7 +175,6 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-        await showProgress("Step 3 of 4", "Encrypting email...");
         
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
@@ -215,7 +212,6 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        await showProgress("Step 4 of 4", "Sending email...");
 
         // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
@@ -739,21 +735,7 @@ async function showOutlookNotification(title, message) {
         message: `${title}: ${message}`,
     });
 }
-async function showProgress(title, message) {
-    Office.context.mailbox.item.notificationMessages.addAsync("progress", {
-        type: "progressIndicator",
-        message: `${title}: ${message}`
-    });
-}
 
-async function showInfo(title, message) {
-    Office.context.mailbox.item.notificationMessages.addAsync("info", {
-        type: "informationalMessage",
-        message: `${title}: ${message}`,
-        icon: "icon16", // optional
-        persistent: false
-    });
-}
 // MSAL Configuration
 const msalConfig = {
     auth: {
