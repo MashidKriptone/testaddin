@@ -396,8 +396,10 @@ async function updateEmailWithEncryptedContent(item, apiResponse) {
         }
 
         for (const attachment of apiResponse.encryptedAttachments) {
+            const fileName = attachment.fileName || "secure-file.ksf";
+            console.log("🔍 Processing attachment:", fileName);
             if (!attachment.fileData || typeof attachment.fileData !== 'string') {
-                console.error("Invalid attachment data:", attachment);
+                console.error("❌ Invalid attachment data for:", fileName);
                 continue;
             }
 
@@ -407,7 +409,7 @@ async function updateEmailWithEncryptedContent(item, apiResponse) {
             await new Promise((resolve, reject) => {
                 item.addFileAttachmentFromBase64Async(
                     cleanBase64,
-                    attachment.fileName || "secure-file.ksf",
+                    fileName,
                     { isInline: false },
                     (result) => {
                         if (result.status === Office.AsyncResultStatus.Succeeded) {
