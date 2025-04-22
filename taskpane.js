@@ -55,7 +55,7 @@ async function onMessageSendHandler(eventArgs) {
             return;
         }
         await showProgress("Step 1 of 4", "Checking email policy...");
-        await delay(1000);
+        
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
         console.log('📧 Processing mail item:', item.itemId);
@@ -147,7 +147,7 @@ async function onMessageSendHandler(eventArgs) {
             }
         }
         await showProgress("Step 2 of 4", "Validating email contents...");
-        await delay(1000);
+        
         // 9. Content scanning if enabled
         if (policy?.contentScanning) {
             console.log('🔎 Scanning email content...');
@@ -178,7 +178,7 @@ async function onMessageSendHandler(eventArgs) {
             }
         }
         await showProgress("Step 3 of 4", "Encrypting email...");
-        await delay(1000);
+        
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
        let emailData;
@@ -216,7 +216,7 @@ async function onMessageSendHandler(eventArgs) {
             return;
         }
         await showProgress("Step 4 of 4", "Sending email...");
-await delay(1000);
+
         // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
             console.log("🔐 Beginning encryption process...");
@@ -934,7 +934,4 @@ async function fetchEmails(token) {
     }
 }
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
  
