@@ -106,7 +106,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-
+        showLoaderStep(1);
         // 7. Fetch policy settings
         console.log('⚖️ Fetching policy settings...');
         let policy;
@@ -146,7 +146,7 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-
+        showLoaderStep(2);
         // 9. Content scanning if enabled
         if (policy?.contentScanning) {
             console.log('🔎 Scanning email content...');
@@ -176,7 +176,7 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-
+        showLoaderStep(3);
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
        let emailData;
@@ -213,7 +213,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-
+        showLoaderStep(4);
         // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
             console.log("🔐 Beginning encryption process...");
@@ -913,6 +913,19 @@ async function fetchEmails(token) {
     } catch (error) {
         console.error("Error fetching emails:", error);
         throw error;
+    }
+}
+
+function showLoaderStep(stepNumber) {
+    showLoader(); // Make sure loader is visible
+    for (let i = 1; i <= 4; i++) {
+        const stepElement = document.getElementById(`step${i}`);
+        if (stepElement) {
+            stepElement.classList.remove("active");
+            if (i === stepNumber) {
+                stepElement.classList.add("active");
+            }
+        }
     }
 }
 
