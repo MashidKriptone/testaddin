@@ -36,7 +36,6 @@ async function onMessageSendHandler(eventArgs) {
     console.log('🚀 onMessageSendHandler started at:', new Date().toISOString());
     
     try {
-        showLoader();
         // 1. Initialize MSAL if not already done
         if (!isInitialized) {
             console.log('⚙️ Initializing MSAL...');
@@ -55,7 +54,8 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-
+        await showProgress("Step 1 of 4", "Checking email policy...");
+        await delay(1000);
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
         console.log('📧 Processing mail item:', item.itemId);
@@ -106,7 +106,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        showLoaderStep(1);
+       
         // 7. Fetch policy settings
         console.log('⚖️ Fetching policy settings...');
         let policy;
@@ -146,7 +146,8 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-        showLoaderStep(2);
+        await showProgress("Step 2 of 4", "Validating email contents...");
+        await delay(1000);
         // 9. Content scanning if enabled
         if (policy?.contentScanning) {
             console.log('🔎 Scanning email content...');
@@ -176,7 +177,8 @@ async function onMessageSendHandler(eventArgs) {
                 return;
             }
         }
-        showLoaderStep(3);
+        await showProgress("Step 3 of 4", "Encrypting email...");
+        await delay(1000);
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
        let emailData;
@@ -213,7 +215,8 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        showLoaderStep(4);
+        await showProgress("Step 4 of 4", "Sending email...");
+await delay(1000);
         // Handle encryption if required
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
             console.log("🔐 Beginning encryption process...");
@@ -268,6 +271,7 @@ async function onMessageSendHandler(eventArgs) {
 
         // 14. All checks passed - allow the email to send
         console.log('✅ All checks passed - allowing send');
+        await showInfo("Success", "Email Send successfully.");
         eventArgs.completed({ allowEvent: true });
 
     } catch (error) {
@@ -278,7 +282,6 @@ async function onMessageSendHandler(eventArgs) {
         );
         eventArgs.completed({ allowEvent: false });
     } finally {
-        hideLoader();
         console.log(`⏱️ Handler completed in ${Date.now() - startTime}ms`);
     }
 }
@@ -730,10 +733,25 @@ function getAttachmentsAsync(item) {
     });
 }
 
-function showOutlookNotification(title, message) {
+async function showOutlookNotification(title, message) {
     Office.context.mailbox.item.notificationMessages.addAsync("error", {
         type: "errorMessage",
         message: `${title}: ${message}`,
+    });
+}
+async function showProgress(title, message) {
+    Office.context.mailbox.item.notificationMessages.addAsync("progress", {
+        type: "progressIndicator",
+        message: `${title}: ${message}`
+    });
+}
+
+async function showInfo(title, message) {
+    Office.context.mailbox.item.notificationMessages.addAsync("info", {
+        type: "informationalMessage",
+        message: `${title}: ${message}`,
+        icon: "icon16", // optional
+        persistent: false
     });
 }
 // MSAL Configuration
@@ -916,25 +934,7 @@ async function fetchEmails(token) {
     }
 }
 
-function showLoaderStep(stepNumber) {
-    showLoader(); // Make sure loader is visible
-    for (let i = 1; i <= 4; i++) {
-        const stepElement = document.getElementById(`step${i}`);
-        if (stepElement) {
-            stepElement.classList.remove("active");
-            if (i === stepNumber) {
-                stepElement.classList.add("active");
-            }
-        }
-    }
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-function showLoader() {
-    const loader = document.getElementById("loader");
-    if (loader) loader.style.display = "flex";
-}
-
-function hideLoader() {
-    const loader = document.getElementById("loader");
-    if (loader) loader.style.display = "none";
-}
+ 
