@@ -486,13 +486,7 @@ async function fetchPolicyDomains(token) {
 
 async function getEncryptedEmail(emailDataDto, token) {
     try {
-        console.log("📤 Sending email data to encryption API", {
-            emailId: emailDataDto.id,
-            from: emailDataDto.fromEmailID,
-            recipientCount: emailDataDto.emailTo.length + emailDataDto.emailCc.length + emailDataDto.emailBcc.length,
-            attachmentCount: emailDataDto.attachments.length
-        });
-
+        console.log("📤 Sending email data to encryption API");
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
@@ -503,57 +497,29 @@ async function getEncryptedEmail(emailDataDto, token) {
             body: JSON.stringify(emailDataDto)
         });
 
+        // First check response status
         if (!response.ok) {
-            let errorDetails;
-            try {
-                errorDetails = await response.json();
-            } catch (e) {
-                errorDetails = await response.text();
-            }
-            
+            // Read the error response once and store it
+            const errorResponse = await response.text();
             console.error("🔴 API Error Response:", {
                 status: response.status,
-                errorDetails
+                errorResponse
             });
-            
             throw new Error(`Encryption failed with status ${response.status}`);
         }
 
+        // Now read the successful response
         const responseData = await response.json();
-        console.log("🔹 Raw API Response:", JSON.stringify(responseData, null, 2));
-         // Detailed response logging
-         console.group('📥 API Response Details');
-         console.log('🔑 Response Metadata:', {
-             responseSize: JSON.stringify(responseData).length + ' bytes',
-             hasAttachments: !!responseData.encryptedAttachments,
-             attachmentCount: responseData.encryptedAttachments?.length || 0
-         });
-         
-         if (responseData.encryptedAttachments) {
-             console.log('📎 Attachments Received:', responseData.encryptedAttachments.map(att => ({
-                 name: att.fileName,
-                 type: att.fileType,
-                 size: att.fileData?.length || 'unknown',
-                 dataPreview: att.fileData?.substring(0, 30) + '...'
-             })));
-         }
-         
-         console.log('📝 Instruction Note Preview:', responseData.instructionNote?.substring(0, 100) + '...');
-         console.log('🔄 Full Response:', responseData);
-         console.groupEnd();
-        // Validate the response contains required fields
+        
+        // Validate response structure
         if (!responseData.encryptedAttachments || responseData.encryptedAttachments.length === 0) {
-            throw new Error("API response missing required encrypted attachments");
+            throw new Error("API response missing encrypted attachments");
         }
 
-        // Use the first attachment as the encrypted file
-        const mainAttachment = responseData.encryptedAttachments[0];
-        
         return {
-            encryptedFile: mainAttachment.fileData,
-            fileName: mainAttachment.fileName || "secure-message.ksf",
-            instructionNote: responseData.instructionNote || 
-                "This email is secured. Please use the attached file to view the content."
+            encryptedFile: responseData.encryptedAttachments[0].fileData,
+            fileName: responseData.encryptedAttachments[0].fileName || "secure-message.ksf",
+            instructionNote: responseData.instructionNote || "Secure email content"
         };
 
     } catch (error) {
