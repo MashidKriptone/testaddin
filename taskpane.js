@@ -510,7 +510,7 @@ async function getEncryptedEmail(emailDataDto, token) {
 
         // Now read the successful response
         const responseData = await response.json();
-        
+        console.log("🔹 Raw API Response:", JSON.stringify(responseData, null, 2));
         // Validate response structure
         if (!responseData.encryptedAttachments || responseData.encryptedAttachments.length === 0) {
             throw new Error("API response missing encrypted attachments");
