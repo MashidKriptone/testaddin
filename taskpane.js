@@ -455,35 +455,82 @@ async function getUserDetails(accessToken) {
     }
 }
 
-// Fetch policy domains from the backend
+// Fetch policy domains from the backend with robust error handling
 async function fetchPolicyDomains(token) {
     try {
+        console.log('🔍 Fetching policy from API...');
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, "X-Tenant-ID": "kriptone.com", },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Accept': 'application/json', 
+                'Authorization': `Bearer ${token}`, 
+                "X-Tenant-ID": "kriptone.com" 
+            },
         });
 
-        if (!response.ok) throw new Error('Failed to fetch policy data: ' + response.statusText);
+        // First check if the response exists and is OK
+        if (!response) {
+            throw new Error('No response received from policy API');
+        }
 
-        const json = await response.json();
-        console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
-        const policy = json[0];
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Policy API responded with status ${response.status}: ${errorText}`);
+        }
 
+        // Try to parse JSON
+        let json;
+        try {
+            json = await response.json();
+            console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
+        } catch (parseError) {
+            throw new Error(`Failed to parse policy API response: ${parseError.message}`);
+        }
+
+        // Handle empty array response
+        if (!json || !Array.isArray(json) || json.length === 0) {
+            console.warn('⚠️ Policy API returned empty array, using default policy');
+            return getDefaultPolicy();
+        }
+
+        // Safely extract the first policy with fallbacks
+        const policy = json[0] || {};
+        
+        // Validate and normalize the policy structure
         return {
-            allowedDomains: policy.allowedDomains || [],
-            blockedDomains: policy.blockedDomains || [],
-            contentScanning: policy.contentScanning,
-            attachmentPolicy: policy.attachmentPolicy,
-            blockedAttachments: policy.blockedAttachments || [],
-            encryptOutgoingEmails: policy.encryptOutgoingEmails || false,
-            encryptOutgoingAttachments: policy.encryptOutgoingAttachments || false
+            allowedDomains: Array.isArray(policy.allowedDomains) ? policy.allowedDomains : [],
+            blockedDomains: Array.isArray(policy.blockedDomains) ? policy.blockedDomains : [],
+            contentScanning: Boolean(policy.contentScanning),
+            attachmentPolicy: Boolean(policy.attachmentPolicy),
+            blockedAttachments: Array.isArray(policy.blockedAttachments) ? policy.blockedAttachments : [],
+            encryptOutgoingEmails: Boolean(policy.encryptOutgoingEmails),
+            encryptOutgoingAttachments: Boolean(policy.encryptOutgoingAttachments)
         };
+
     } catch (error) {
-        console.error("❌ Error fetching policy:", error);
-        return { allowedDomains: [], blockedDomains: [], contentScanning: false, attachmentPolicy: false, blockedAttachments: [] };
+        console.error("❌ Error fetching policy:", {
+            error: error.message,
+            stack: error.stack
+        });
+        
+        // Return a default policy that's secure but permissive enough
+        return getDefaultPolicy();
     }
 }
 
+// Default policy to use when API fails or returns empty
+function getDefaultPolicy() {
+    return {
+        allowedDomains: [], // Empty means no domain restrictions
+        blockedDomains: [], // Empty means no blocked domains
+        contentScanning: true, // Enable content scanning by default for safety
+        attachmentPolicy: true, // Enable attachment policy by default
+        blockedAttachments: ['exe', 'bat', 'sh', 'dll', 'msi'], // Common dangerous extensions
+        encryptOutgoingEmails: false, // Disable by default to avoid blocking emails
+        encryptOutgoingAttachments: false // Disable by default
+    };
+}
 async function getEncryptedEmail(emailDataDto, token) {
     try {
         console.log("📤 Sending email data to encryption API");
