@@ -35,75 +35,97 @@ const regexPatterns = {
     ibanAzerbaijan: /[^\w](AZ\d{2}(\s[A-Za-z0-9]{4}\s(\d{4}\s){4}\d{4}|[A-Za-z0-9]{4}\d{20}))[^\w]/,
 };
 
+async function getEnhancedCompanyInfo(token) {
+    const result = {
+        companyName: null,
+        verifiedDomains: [],
+        primaryAdmin: null
+    };
+
+    try {
+        // 1. First try to get organization info (requires Organization.Read.All)
+        const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (orgResponse.ok) {
+            const orgData = await orgResponse.json();
+            if (orgData.value && orgData.value[0]) {
+                result.companyName = orgData.value[0].displayName;
+                result.verifiedDomains = orgData.value[0].verifiedDomains || [];
+            }
+        } else {
+            console.warn('Organization API responded with:', orgResponse.status);
+        }
+
+        // 2. Try to get user's manager (fallback for admin info)
+        try {
+            const meResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=displayName,jobTitle,department,mail,userPrincipalName', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (meResponse.ok) {
+                const userData = await meResponse.json();
+                result.currentUser = {
+                    name: userData.displayName,
+                    email: userData.mail || userData.userPrincipalName,
+                    jobTitle: userData.jobTitle,
+                    department: userData.department
+                };
+            }
+        } catch (userError) {
+            console.warn('Could not fetch user details:', userError);
+        }
+
+    } catch (error) {
+        console.error("Error in getEnhancedCompanyInfo:", error);
+    }
+    
+    return result;
+}
+
 async function trackInstallation() {
-    // Get basic info immediately available
     const basicInfo = {
         domain: Office.context.mailbox.userProfile.emailAddress.split('@')[1],
         userEmail: Office.context.mailbox.userProfile.emailAddress,
         timestamp: new Date().toISOString()
     };
 
-    // Initialize enhanced info as empty object
     let enhancedInfo = {};
-
+    
     try {
-        // Try to get more detailed info if user is authenticated
         if (isInitialized) {
             const token = await getAccessToken().catch(() => null);
             if (token) {
                 enhancedInfo = await getEnhancedCompanyInfo(token) || {};
             }
         }
-        
-        // Prepare the complete payload
-        const installationData = {
-            ...basicInfo,
-            ...enhancedInfo,
-            addinVersion: '1.0.0',
-            platform: 'Outlook ' + Office.context.mailbox.diagnostics.hostVersion
-        };
 
-        // Console.log the complete data in readable format
         console.groupCollapsed('📩 Add-in Installation Data');
-        console.log('🕒 Timestamp:', installationData.timestamp);
-        console.log('👤 User Email:', installationData.userEmail);
-        console.log('🌐 Domain:', installationData.domain);
-        console.log('🏢 Company Name:', installationData.companyName || 'Not available');
-        console.log('🔢 Verified Domains:', installationData.verifiedDomains || []);
-        console.log('👨‍💼 Admin Contact:', installationData.primaryAdmin || 'Not available');
-        console.log('🛠️ Add-in Version:', installationData.addinVersion);
-        console.log('💻 Outlook Version:', installationData.platform.replace('Outlook ', ''));
+        console.log('Basic Info:', {
+            '🕒 Timestamp': basicInfo.timestamp,
+            '📧 User Email': basicInfo.userEmail,
+            '🌐 Domain': basicInfo.domain,
+            '🛠️ Add-in Version': '1.0.0',
+            '💻 Outlook Version': Office.context.mailbox.diagnostics.hostVersion
+        });
+
+        if (enhancedInfo.companyName || enhancedInfo.currentUser) {
+            console.log('Enhanced Info:', {
+                '🏢 Company': enhancedInfo.companyName || 'Not available',
+                '🔢 Verified Domains': enhancedInfo.verifiedDomains.length 
+                    ? enhancedInfo.verifiedDomains.map(d => d.name).join(', ') 
+                    : 'None',
+                '👤 Current User': enhancedInfo.currentUser || 'Not available'
+            });
+        } else {
+            console.log('ℹ️ Additional company info not available (missing permissions)');
+        }
+        
         console.groupEnd();
 
     } catch (error) {
-        console.error('Error gathering installation info:', error);
-    }
-}
-
-// Helper function to get company info (unchanged from previous example)
-async function getEnhancedCompanyInfo(token) {
-    try {
-        const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const orgData = await orgResponse.json();
-        
-        const adminsResponse = await fetch('https://graph.microsoft.com/v1.0/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const adminsData = await adminsResponse.json();
-        
-        return {
-            companyName: orgData.value[0]?.displayName,
-            verifiedDomains: orgData.value[0]?.verifiedDomains,
-            primaryAdmin: adminsData.value[0] ? {
-                name: adminsData.value[0].displayName,
-                email: adminsData.value[0].mail || adminsData.value[0].userPrincipalName
-            } : null
-        };
-    } catch (error) {
-        console.error("Couldn't fetch full company info:", error);
-        return null;
+        console.error('Installation tracking failed:', error);
     }
 }
 
