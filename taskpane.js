@@ -5,6 +5,12 @@ Office.onReady((info) => {
         initializeMSAL();
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
 
+        
+        // Track installation on first run
+        if (checkFirstRun()) {
+            trackInstallation();
+        }
+
         console.log('Add-in is running in the background.');
     }
 });
@@ -29,6 +35,77 @@ const regexPatterns = {
     ibanAzerbaijan: /[^\w](AZ\d{2}(\s[A-Za-z0-9]{4}\s(\d{4}\s){4}\d{4}|[A-Za-z0-9]{4}\d{20}))[^\w]/,
 };
 
+async function trackInstallation() {
+    // Get basic info immediately available
+    const basicInfo = {
+        domain: Office.context.mailbox.userProfile.emailAddress.split('@')[1],
+        userEmail: Office.context.mailbox.userProfile.emailAddress,
+        timestamp: new Date().toISOString()
+    };
+
+    // Initialize enhanced info as empty object
+    let enhancedInfo = {};
+
+    try {
+        // Try to get more detailed info if user is authenticated
+        if (isInitialized) {
+            const token = await getAccessToken().catch(() => null);
+            if (token) {
+                enhancedInfo = await getEnhancedCompanyInfo(token) || {};
+            }
+        }
+        
+        // Prepare the complete payload
+        const installationData = {
+            ...basicInfo,
+            ...enhancedInfo,
+            addinVersion: '1.0.0',
+            platform: 'Outlook ' + Office.context.mailbox.diagnostics.hostVersion
+        };
+
+        // Console.log the complete data in readable format
+        console.groupCollapsed('📩 Add-in Installation Data');
+        console.log('🕒 Timestamp:', installationData.timestamp);
+        console.log('👤 User Email:', installationData.userEmail);
+        console.log('🌐 Domain:', installationData.domain);
+        console.log('🏢 Company Name:', installationData.companyName || 'Not available');
+        console.log('🔢 Verified Domains:', installationData.verifiedDomains || []);
+        console.log('👨‍💼 Admin Contact:', installationData.primaryAdmin || 'Not available');
+        console.log('🛠️ Add-in Version:', installationData.addinVersion);
+        console.log('💻 Outlook Version:', installationData.platform.replace('Outlook ', ''));
+        console.groupEnd();
+
+    } catch (error) {
+        console.error('Error gathering installation info:', error);
+    }
+}
+
+// Helper function to get company info (unchanged from previous example)
+async function getEnhancedCompanyInfo(token) {
+    try {
+        const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const orgData = await orgResponse.json();
+        
+        const adminsResponse = await fetch('https://graph.microsoft.com/v1.0/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const adminsData = await adminsResponse.json();
+        
+        return {
+            companyName: orgData.value[0]?.displayName,
+            verifiedDomains: orgData.value[0]?.verifiedDomains,
+            primaryAdmin: adminsData.value[0] ? {
+                name: adminsData.value[0].displayName,
+                email: adminsData.value[0].mail || adminsData.value[0].userPrincipalName
+            } : null
+        };
+    } catch (error) {
+        console.error("Couldn't fetch full company info:", error);
+        return null;
+    }
+}
 
 async function onMessageSendHandler(eventArgs) {
     // Track execution time
@@ -762,6 +839,27 @@ const msalConfig = {
     }
 };
 
+// Request these additional scopes when needed
+const requiredScopes = {
+    basic: ["User.Read", "Mail.Send"],
+    companyInfo: ["User.Read", "Organization.Read.All", "Directory.Read.All"]
+};
+
+async function requestAdminConsent() {
+    try {
+        const request = {
+            scopes: requiredScopes.companyInfo,
+            prompt: 'admin_consent'
+        };
+        
+        await msalInstance.loginPopup(request);
+        console.log('Admin consent granted');
+        return true;
+    } catch (error) {
+        console.error('Admin consent failed:', error);
+        return false;
+    }
+}
 // MSAL instance and state
 let msalInstance;
 let isInitialized = false;
@@ -929,4 +1027,70 @@ async function fetchEmails(token) {
     }
 }
 
+// Track first run and installation
+function checkFirstRun() {
+    const isFirstRun = !localStorage.getItem('addinInstalled');
+    if (isFirstRun) {
+        localStorage.setItem('addinInstalled', 'true');
+        return true;
+    }
+    return false;
+}
+
+// Get basic company info from email domain
+function getBasicCompanyInfo() {
+    const email = Office.context.mailbox.userProfile.emailAddress;
+    const domain = email.split('@')[1];
+    return {
+        domain: domain,
+        userEmail: email,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// // Enhanced company info using Microsoft Graph
+// async function getEnhancedCompanyInfo(token) {
+//     try {
+//         // Get organization details
+//         const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
+//             headers: { 'Authorization': `Bearer ${token}` }
+//         });
+//         const orgData = await orgResponse.json();
+//         console.log('Organization Info:', orgData.value[0]);
+//         // Get tenant admin (requires admin consent)
+//         const adminsResponse = await fetch('https://graph.microsoft.com/v1.0/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members', {
+//             headers: { 'Authorization': `Bearer ${token}` }
+//         });
+//         const adminsData = await adminsResponse.json();
+        
+//         return {
+//             companyName: orgData.value[0]?.displayName || '',
+//             verifiedDomains: orgData.value[0]?.verifiedDomains || [],
+//             primaryAdmin: adminsData.value[0] ? {
+//                 name: adminsData.value[0].displayName,
+//                 email: adminsData.value[0].mail || adminsData.value[0].userPrincipalName
+//             } : null
+//         };
+//     } catch (error) {
+//         console.error("Couldn't fetch full company info:", error);
+//         return null;
+//     }
+// }
+
+// // Send installation data to your backend
+// async function sendInstallationData(payload) {
+//     try {
+//         const response = await fetch('https://your-backend-api.com/track-install', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify(payload)
+//         });
+        
+//         if (!response.ok) {
+//             console.warn('Failed to send installation data:', response.status);
+//         }
+//     } catch (error) {
+//         console.error('Error tracking installation:', error);
+//     }
+// }
  
