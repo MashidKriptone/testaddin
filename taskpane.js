@@ -6,12 +6,10 @@ Office.onReady((info) => {
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
 
         
-        // Track installation on first run
-        if (checkFirstRun()) {
-            trackInstallation();
-        }
-
-        console.log('Add-in is running in the background.');
+        // Track installation and log info
+        trackInstallation().then(() => {
+            console.log('Add-in is running in the background.');
+        });
     }
 });
 
@@ -35,100 +33,73 @@ const regexPatterns = {
     ibanAzerbaijan: /[^\w](AZ\d{2}(\s[A-Za-z0-9]{4}\s(\d{4}\s){4}\d{4}|[A-Za-z0-9]{4}\d{20}))[^\w]/,
 };
 
-async function getEnhancedCompanyInfo(token) {
-    const result = {
-        companyName: null,
-        verifiedDomains: [],
-        primaryAdmin: null
-    };
-
-    try {
-        // 1. First try to get organization info (requires Organization.Read.All)
-        const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (orgResponse.ok) {
-            const orgData = await orgResponse.json();
-            if (orgData.value && orgData.value[0]) {
-                result.companyName = orgData.value[0].displayName;
-                result.verifiedDomains = orgData.value[0].verifiedDomains || [];
-            }
-        } else {
-            console.warn('Organization API responded with:', orgResponse.status);
-        }
-
-        // 2. Try to get user's manager (fallback for admin info)
-        try {
-            const meResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=displayName,jobTitle,department,mail,userPrincipalName', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (meResponse.ok) {
-                const userData = await meResponse.json();
-                result.currentUser = {
-                    name: userData.displayName,
-                    email: userData.mail || userData.userPrincipalName,
-                    jobTitle: userData.jobTitle,
-                    department: userData.department
-                };
-            }
-        } catch (userError) {
-            console.warn('Could not fetch user details:', userError);
-        }
-
-    } catch (error) {
-        console.error("Error in getEnhancedCompanyInfo:", error);
-    }
-    
-    return result;
-}
-
 async function trackInstallation() {
+    // Basic info available without authentication
     const basicInfo = {
-        domain: Office.context.mailbox.userProfile.emailAddress.split('@')[1],
+        timestamp: new Date().toISOString(),
         userEmail: Office.context.mailbox.userProfile.emailAddress,
-        timestamp: new Date().toISOString()
+        domain: Office.context.mailbox.userProfile.emailAddress.split('@')[1] || 'unknown',
+        addinVersion: '1.0.0',
+        outlookVersion: Office.context.mailbox.diagnostics.hostVersion,
+        platform: Office.context.mailbox.diagnostics.platform
     };
 
-    let enhancedInfo = {};
-    
+    console.group('📩 Add-in Installation Info');
+    console.log('🕒 Timestamp:', basicInfo.timestamp);
+    console.log('👤 User Email:', basicInfo.userEmail);
+    console.log('🌐 Domain:', basicInfo.domain);
+    console.log('🛠️ Add-in Version:', basicInfo.addinVersion);
+    console.log('💻 Outlook Version:', basicInfo.outlookVersion);
+    console.log('📱 Platform:', basicInfo.platform);
+
     try {
         if (isInitialized) {
             const token = await getAccessToken().catch(() => null);
             if (token) {
-                enhancedInfo = await getEnhancedCompanyInfo(token) || {};
+                console.log('🔑 Authentication successful, fetching additional info...');
+                
+                // Get user details
+                const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    console.log('👨‍💼 User Details:', {
+                        name: userData.displayName,
+                        jobTitle: userData.jobTitle,
+                        department: userData.department
+                    });
+                } else {
+                    console.log('⚠️ Could not fetch user details - status:', userResponse.status);
+                }
+
+                // Try to get organization info (may fail without admin consent)
+                try {
+                    const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (orgResponse.ok) {
+                        const orgData = await orgResponse.json();
+                        if (orgData.value && orgData.value[0]) {
+                            console.log('🏢 Organization Info:', {
+                                companyName: orgData.value[0].displayName,
+                                verifiedDomains: orgData.value[0].verifiedDomains.map(d => d.name).join(', ')
+                            });
+                        }
+                    }
+                } catch (orgError) {
+                    console.log('ℹ️ Additional organization info not available (missing permissions)');
+                }
             }
         }
-
-        console.groupCollapsed('📩 Add-in Installation Data');
-        console.log('Basic Info:', {
-            '🕒 Timestamp': basicInfo.timestamp,
-            '📧 User Email': basicInfo.userEmail,
-            '🌐 Domain': basicInfo.domain,
-            '🛠️ Add-in Version': '1.0.0',
-            '💻 Outlook Version': Office.context.mailbox.diagnostics.hostVersion
-        });
-
-        if (enhancedInfo.companyName || enhancedInfo.currentUser) {
-            console.log('Enhanced Info:', {
-                '🏢 Company': enhancedInfo.companyName || 'Not available',
-                '🔢 Verified Domains': enhancedInfo.verifiedDomains.length 
-                    ? enhancedInfo.verifiedDomains.map(d => d.name).join(', ') 
-                    : 'None',
-                '👤 Current User': enhancedInfo.currentUser || 'Not available'
-            });
-        } else {
-            console.log('ℹ️ Additional company info not available (missing permissions)');
-        }
-        
-        console.groupEnd();
-
     } catch (error) {
-        console.error('Installation tracking failed:', error);
+        console.error('Error during installation tracking:', error);
+    } finally {
+        console.groupEnd();
     }
 }
-
 async function onMessageSendHandler(eventArgs) {
     // Track execution time
     const startTime = Date.now();
