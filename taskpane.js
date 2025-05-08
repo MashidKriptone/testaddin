@@ -104,7 +104,7 @@ async function trackInstallation() {
 
     try {
         // 4. Attempt registration
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Company', {
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
