@@ -63,38 +63,48 @@ const regexPatterns = {
 // }
 
 async function trackInstallation() {
-    // 1. Basic installation info (always available)
+    // 1. Basic installation info
+    const userEmail = Office.context.mailbox.userProfile.emailAddress;
+    const domain = userEmail.split('@')[1] || 'unknown';
     const installationData = {
         timestamp: new Date().toISOString(),
-        userEmail: Office.context.mailbox.userProfile.emailAddress,
+        userEmail: userEmail,
         outlookVersion: Office.context.mailbox.diagnostics.hostVersion,
         addinVersion: '1.0.0'
     };
 
-    // 2. Prepare company registration payload
-    const domain = installationData.userEmail.split('@')[1] || 'unknown';
+    // 2. Check local storage first
+    const existingRegistration = localStorage.getItem('companyRegistration');
+    if (existingRegistration) {
+        const data = JSON.parse(existingRegistration);
+        if (data.status === 'registered') {
+            console.log('Company already registered for this installation');
+            return;
+        }
+    }
+
+    // 3. Prepare payload
     const companyData = {
-        companyId: generateUUID(), // Generate new UUID for the company
+        companyId: generateUUID(),
         companyName: domain.split('.')[0] + ' (auto-detected)',
         domainName: domain,
         databaseName: `db_${domain.replace(/\./g, '_')}`,
         licenseType: "Trial",
         numberOfLicenses: 1,
-        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         message: "Auto-registered via Outlook add-in installation",
-        registeredByEmail: installationData.userEmail
+        registeredByEmail: userEmail,
+        // Default empty values for required fields
+        city: "",
+        state: "",
+        country: "",
+        pin: "",
+        emailServiceProvider: 0
     };
 
-    // 3. Store locally first
-    localStorage.setItem('companyRegistration', JSON.stringify({
-        ...installationData,
-        ...companyData,
-        status: 'pending'
-    }));
-
-    // 4. Try to register with backend
     try {
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding', {
+        // 4. Attempt registration
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Company', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -105,22 +115,44 @@ async function trackInstallation() {
         });
 
         if (response.ok) {
-            // Update local storage with success status
-            const savedData = JSON.parse(localStorage.getItem('companyRegistration'));
             localStorage.setItem('companyRegistration', JSON.stringify({
-                ...savedData,
-                status: 'registered',
-                registrationDate: new Date().toISOString()
+                ...installationData,
+                ...companyData,
+                status: 'registered'
             }));
-            console.log('✅ Company successfully registered');
+            console.log('✅ Company registration successful');
+        } else if (response.status === 409) {
+            // Handle "already registered" case
+            const errorData = await response.json();
+            console.warn('⚠️ Company exists:', errorData.message);
+            
+            // Store as "verified" instead of "registered"
+            localStorage.setItem('companyRegistration', JSON.stringify({
+                ...installationData,
+                status: 'verified',
+                verificationDate: new Date().toISOString(),
+                serverMessage: errorData.message
+            }));
+            
+            // Optional: Show user-friendly notification
+            await showOutlookNotification(
+                "Welcome Back", 
+                "Your company is already registered in our system"
+            );
         } else {
-            console.warn('⚠️ Company registration failed with status:', response.status);
+            console.error('Registration failed:', response.status);
         }
     } catch (error) {
-        console.error('Company registration error:', error);
+        console.error('Registration error:', error);
+        // Store as "pending" for retry later
+        localStorage.setItem('companyRegistration', JSON.stringify({
+            ...installationData,
+            ...companyData,
+            status: 'pending',
+            lastAttempt: new Date().toISOString()
+        }));
     }
 }
-
 async function onMessageSendHandler(eventArgs) {
     // Track execution time
     const startTime = Date.now();
