@@ -98,7 +98,8 @@ async function trackInstallation() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                "X-Tenant-ID": "kriptone.com"
             },
             body: JSON.stringify(companyData)
         });
