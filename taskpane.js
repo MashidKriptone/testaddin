@@ -94,7 +94,7 @@ async function trackInstallation() {
 
     // 4. Try to register with backend
     try {
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Company', {
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
