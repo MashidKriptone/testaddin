@@ -32,74 +32,94 @@ const regexPatterns = {
     ssnAustria: /[^\w-.;&](\d{4}[0-3]\d(0[1-9]|1[0-2])\d{2})[^\w-.;&]/,
     ibanAzerbaijan: /[^\w](AZ\d{2}(\s[A-Za-z0-9]{4}\s(\d{4}\s){4}\d{4}|[A-Za-z0-9]{4}\d{20}))[^\w]/,
 };
+// function checkFirstRun() {
+//     const isFirstRun = !localStorage.getItem('addinInstalled');
+//     if (isFirstRun) {
+//         localStorage.setItem('addinInstalled', 'true');
+//         return true;
+//     }
+//     return false;
+// }
+// async function sendInstallationData(payload) {
+//     try {
+//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Installation', {
+//             method: 'POST',
+//             headers: { 
+//                 'Content-Type': 'application/json',
+//                 'Accept': 'application/json'
+//             },
+//             body: JSON.stringify(payload)
+//         });
+        
+//         if (!response.ok) {
+//             console.warn('Failed to send installation data:', response.status);
+//             return false;
+//         }
+//         return true;
+//     } catch (error) {
+//         console.error('Error tracking installation:', error);
+//         return false;
+//     }
+// }
 
 async function trackInstallation() {
-    // Basic info available without authentication
-    const basicInfo = {
+    // 1. Basic installation info (always available)
+    const installationData = {
         timestamp: new Date().toISOString(),
         userEmail: Office.context.mailbox.userProfile.emailAddress,
-        domain: Office.context.mailbox.userProfile.emailAddress.split('@')[1] || 'unknown',
-        addinVersion: '1.0.0',
         outlookVersion: Office.context.mailbox.diagnostics.hostVersion,
-        platform: Office.context.mailbox.diagnostics.platform
+        addinVersion: '1.0.0'
     };
 
-    console.group('📩 Add-in Installation Info');
-    console.log('🕒 Timestamp:', basicInfo.timestamp);
-    console.log('👤 User Email:', basicInfo.userEmail);
-    console.log('🌐 Domain:', basicInfo.domain);
-    console.log('🛠️ Add-in Version:', basicInfo.addinVersion);
-    console.log('💻 Outlook Version:', basicInfo.outlookVersion);
-    console.log('📱 Platform:', basicInfo.platform);
+    // 2. Prepare company registration payload
+    const domain = installationData.userEmail.split('@')[1] || 'unknown';
+    const companyData = {
+        companyId: generateUUID(), // Generate new UUID for the company
+        companyName: domain.split('.')[0] + ' (auto-detected)',
+        domainName: domain,
+        databaseName: `db_${domain.replace(/\./g, '_')}`,
+        licenseType: "Trial",
+        numberOfLicenses: 1,
+        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        message: "Auto-registered via Outlook add-in installation",
+        registeredByEmail: installationData.userEmail
+    };
 
+    // 3. Store locally first
+    localStorage.setItem('companyRegistration', JSON.stringify({
+        ...installationData,
+        ...companyData,
+        status: 'pending'
+    }));
+
+    // 4. Try to register with backend
     try {
-        if (isInitialized) {
-            const token = await getAccessToken().catch(() => null);
-            if (token) {
-                console.log('🔑 Authentication successful, fetching additional info...');
-                
-                // Get user details
-                const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (userResponse.ok) {
-                    const userData = await userResponse.json();
-                    console.log('👨‍💼 User Details:', {
-                        name: userData.displayName,
-                        jobTitle: userData.jobTitle,
-                        department: userData.department
-                    });
-                } else {
-                    console.log('⚠️ Could not fetch user details - status:', userResponse.status);
-                }
+        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Company', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(companyData)
+        });
 
-                // Try to get organization info (may fail without admin consent)
-                try {
-                    const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    
-                    if (orgResponse.ok) {
-                        const orgData = await orgResponse.json();
-                        if (orgData.value && orgData.value[0]) {
-                            console.log('🏢 Organization Info:', {
-                                companyName: orgData.value[0].displayName,
-                                verifiedDomains: orgData.value[0].verifiedDomains.map(d => d.name).join(', ')
-                            });
-                        }
-                    }
-                } catch (orgError) {
-                    console.log('ℹ️ Additional organization info not available (missing permissions)');
-                }
-            }
+        if (response.ok) {
+            // Update local storage with success status
+            const savedData = JSON.parse(localStorage.getItem('companyRegistration'));
+            localStorage.setItem('companyRegistration', JSON.stringify({
+                ...savedData,
+                status: 'registered',
+                registrationDate: new Date().toISOString()
+            }));
+            console.log('✅ Company successfully registered');
+        } else {
+            console.warn('⚠️ Company registration failed with status:', response.status);
         }
     } catch (error) {
-        console.error('Error during installation tracking:', error);
-    } finally {
-        console.groupEnd();
+        console.error('Company registration error:', error);
     }
 }
+
 async function onMessageSendHandler(eventArgs) {
     // Track execution time
     const startTime = Date.now();
