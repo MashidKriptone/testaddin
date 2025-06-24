@@ -90,6 +90,103 @@
                   </Action>
                 </Control> -->
               </Group>
+               <Group id="irmControlsGroup">
+                  <Label resid="IRMGroupLabel" />
+                  <Control xsi:type="Button" id="blockCopyButton">
+                    <Label resid="BlockCopyButton.Label" />
+                    <Supertip>
+                      <Title resid="BlockCopyButton.Label" />
+                      <Description resid="BlockCopyButton.Tooltip" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="IRMCopyIcon.16x16" />
+                      <bt:Image size="32" resid="IRMCopyIcon.32x32" />
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>toggleBlockCopy</FunctionName>
+                    </Action>
+                  </Control>
+                  <Control xsi:type="Button" id="blockPrintButton">
+                    <Label resid="BlockPrintButton.Label" />
+                    <Supertip>
+                      <Title resid="BlockPrintButton.Label" />
+                      <Description resid="BlockPrintButton.Tooltip" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="IRMPrintIcon.16x16" />
+                      <bt:Image size="32" resid="IRMPrintIcon.32x32" />
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>toggleBlockPrint</FunctionName>
+                    </Action>
+                  </Control>
+                  <Control xsi:type="Button" id="blockSaveAsButton">
+                    <Label resid="BlockSaveAsButton.Label" />
+                    <Supertip>
+                      <Title resid="BlockSaveAsButton.Label" />
+                      <Description resid="BlockSaveAsButton.Tooltip" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="IRMSaveIcon.16x16" />
+                      <bt:Image size="32" resid="IRMSaveIcon.32x32" />
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>toggleBlockSaveAs</FunctionName>
+                    </Action>
+                  </Control>
+                  <Control xsi:type="Menu" id="irmAdvancedMenu">
+                    <Label resid="AdvancedIRMButton.Label" />
+                    <Supertip>
+                      <Title resid="AdvancedIRMButton.Label" />
+                      <Description resid="AdvancedIRMButton.Tooltip" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="IRMAdvancedIcon.16x16" />
+                      <bt:Image size="32" resid="IRMAdvancedIcon.32x32" />
+                    </Icon>
+                    <Items>
+                      <Item id="blockEditButton">
+                        <Label resid="BlockEditButton.Label" />
+                        <Supertip>
+                          <Title resid="BlockEditButton.Label" />
+                          <Description resid="BlockEditButton.Tooltip" />
+                        </Supertip>
+                        <Icon>
+                          <bt:Image size="16" resid="IRMEditIcon.16x16" />
+                        </Icon>
+                        <Action xsi:type="ExecuteFunction">
+                          <FunctionName>toggleBlockEdit</FunctionName>
+                        </Action>
+                      </Item>
+                      <Item id="blockScreenCaptureButton">
+                        <Label resid="BlockScreenCaptureButton.Label" />
+                        <Supertip>
+                          <Title resid="BlockScreenCaptureButton.Label" />
+                          <Description resid="BlockScreenCaptureButton.Tooltip" />
+                        </Supertip>
+                        <Icon>
+                          <bt:Image size="16" resid="IRMScreenIcon.16x16" />
+                        </Icon>
+                        <Action xsi:type="ExecuteFunction">
+                          <FunctionName>toggleScreenCapture</FunctionName>
+                        </Action>
+                      </Item>
+                      <Item id="lockOnFailureButton">
+                        <Label resid="LockOnFailureButton.Label" />
+                        <Supertip>
+                          <Title resid="LockOnFailureButton.Label" />
+                          <Description resid="LockOnFailureButton.Tooltip" />
+                        </Supertip>
+                        <Icon>
+                          <bt:Image size="16" resid="IRMLockIcon.16x16" />
+                        </Icon>
+                        <Action xsi:type="ExecuteFunction">
+                          <FunctionName>toggleLockOnFailure</FunctionName>
+                        </Action>
+                      </Item>
+                    </Items>
+                  </Control>
+                </Group>
             </OfficeTab>
           </ExtensionPoint>
           <!-- Enable launching the add-in on the included event. -->
@@ -105,10 +202,24 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://i.postimg.cc/QthbGV5h/Kntrol-Email-Icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://i.postimg.cc/tTqhvwQg/Kntrol-Email-Icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png"/>
-      </bt:Images>
+          <!-- Main icons -->
+          <bt:Image id="Icon.16x16" DefaultValue="https://i.postimg.cc/QthbGV5h/Kntrol-Email-Icon-16.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://i.postimg.cc/tTqhvwQg/Kntrol-Email-Icon-32.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://i.postimg.cc/9FBvLp6L/download-resizehood-com-3.png"/>
+          
+          <!-- IRM Control Icons -->
+          <bt:Image id="IRMCopyIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/copy-block-16.png"/>
+          <bt:Image id="IRMCopyIcon.32x32" DefaultValue="https://i.postimg.cc/3wZqJQ7V/copy-block-32.png"/>
+          <bt:Image id="IRMPrintIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/print-block-16.png"/>
+          <bt:Image id="IRMPrintIcon.32x32" DefaultValue="https://i.postimg.cc/3wZqJQ7V/print-block-32.png"/>
+          <bt:Image id="IRMSaveIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/save-block-16.png"/>
+          <bt:Image id="IRMSaveIcon.32x32" DefaultValue="https://i.postimg.cc/3wZqJQ7V/save-block-32.png"/>
+          <bt:Image id="IRMAdvancedIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/advanced-16.png"/>
+          <bt:Image id="IRMAdvancedIcon.32x32" DefaultValue="https://i.postimg.cc/3wZqJQ7V/advanced-32.png"/>
+          <bt:Image id="IRMEditIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/edit-block-16.png"/>
+          <bt:Image id="IRMScreenIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/screen-block-16.png"/>
+          <bt:Image id="IRMLockIcon.16x16" DefaultValue="https://i.postimg.cc/3wZqJQ7V/lock-16.png"/>
+        </bt:Images>
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
         <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
@@ -120,10 +231,27 @@
         <bt:String id="GroupLabel" DefaultValue="Contoso Add-in"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
         <bt:String id="ActionButton.Label" DefaultValue="Perform an action"/>
+          <!-- IRM Control Strings -->
+          <bt:String id="IRMGroupLabel" DefaultValue="IRM Controls"/>
+          <bt:String id="BlockCopyButton.Label" DefaultValue="Block Copy"/>
+          <bt:String id="BlockPrintButton.Label" DefaultValue="Block Print"/>
+          <bt:String id="BlockSaveAsButton.Label" DefaultValue="Block SaveAs"/>
+          <bt:String id="AdvancedIRMButton.Label" DefaultValue="Advanced IRM"/>
+          <bt:String id="BlockEditButton.Label" DefaultValue="Block Edit"/>
+          <bt:String id="BlockScreenCaptureButton.Label" DefaultValue="Block Screen Capture"/>
+          <bt:String id="LockOnFailureButton.Label" DefaultValue="Lock On Failure"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane to provide additional functionality or information."/>
         <bt:String id="ActionButton.Tooltip" DefaultValue="Perform an action when clicked."/>
+         <!-- IRM Control Tooltips -->
+          <bt:String id="BlockCopyButton.Tooltip" DefaultValue="Prevent recipients from copying content from this email"/>
+          <bt:String id="BlockPrintButton.Tooltip" DefaultValue="Prevent recipients from printing this email"/>
+          <bt:String id="BlockSaveAsButton.Tooltip" DefaultValue="Prevent recipients from saving this email to other formats"/>
+          <bt:String id="AdvancedIRMButton.Tooltip" DefaultValue="Advanced Information Rights Management controls"/>
+          <bt:String id="BlockEditButton.Tooltip" DefaultValue="Prevent recipients from editing this email"/>
+          <bt:String id="BlockScreenCaptureButton.Tooltip" DefaultValue="Prevent screen capture of this email content"/>
+          <bt:String id="LockOnFailureButton.Tooltip" DefaultValue="Lock the email after failed access attempts"/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

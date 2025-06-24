@@ -2,35 +2,108 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KntrolEMAIL</title>
     <link rel="stylesheet" href="taskpane.css">
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.24.0/js/msal-browser.min.js"></script>
 </head>
 <body>
-    <h2 class="ms-font-xl"><span class="kntrol">Kntrol</span><span class="email">EMAIL</span></h2>    
-    <p>KntrolEMAIL helps you manage and monitor email content before sending. It ensures compliance with your organization's policies by checking the subject and body before sending an email.</p>
-    <p>Features:</p>
-    <ul>
-        <li>Prevents sending emails with empty subjects or bodies.</li>
-        <li>Ensures compliance with organizational email policies.</li>
-        <li>Works seamlessly within Microsoft Outlook.</li>
-    </ul>
+    <div class="container">
+        <header>
+            <h2 class="ms-font-xl"><span class="kntrol">Kntrol</span><span class="email">EMAIL</span></h2>
+            <p class="subtitle">Secure Email with Information Rights Management</p>
+        </header>
 
-    <!-- Sign In Button -->
-    <button id="signInButton">Sign In</button>
-    <button id="signOutButton" style="display:none;">Sign Out</button>
-    <div id="loader" style="display: none;">
-        <div class="loader-container">
+        <div id="authSection">
+            <button id="signInButton" class="ms-Button ms-Button--primary">
+                <span class="ms-Button-label">Sign In</span>
+            </button>
+            <button id="signOutButton" class="ms-Button" style="display:none;">
+                <span class="ms-Button-label">Sign Out</span>
+            </button>
+        </div>
+
+        <div id="mainContent" style="display:none;">
+            <section class="description">
+                <p>KntrolEMAIL helps you manage and monitor email content with advanced IRM controls before sending. It ensures compliance with your organization's security policies.</p>
+            </section>
+
+            <section class="irm-controls">
+                <h3>Basic IRM Controls</h3>
+                <div class="control-grid">
+                    <div class="control-item">
+                        <input type="checkbox" id="blockCopyCheckbox" class="irm-checkbox">
+                        <label for="blockCopyCheckbox">Block Copy</label>
+                    </div>
+                    <div class="control-item">
+                        <input type="checkbox" id="blockPrintCheckbox" class="irm-checkbox">
+                        <label for="blockPrintCheckbox">Block Print</label>
+                    </div>
+                    <div class="control-item">
+                        <input type="checkbox" id="blockSaveAsCheckbox" class="irm-checkbox">
+                        <label for="blockSaveAsCheckbox">Block SaveAs</label>
+                    </div>
+                </div>
+
+                <h3>Advanced IRM Controls</h3>
+                <div class="control-grid">
+                    <div class="control-item">
+                        <input type="checkbox" id="blockEditCheckbox" class="irm-checkbox">
+                        <label for="blockEditCheckbox">Block Edit</label>
+                    </div>
+                    <div class="control-item">
+                        <input type="checkbox" id="blockScreenCaptureCheckbox" class="irm-checkbox">
+                        <label for="blockScreenCaptureCheckbox">Block Screen Capture</label>
+                    </div>
+                    <div class="control-item">
+                        <input type="checkbox" id="lockOnFailureCheckbox" class="irm-checkbox">
+                        <label for="lockOnFailureCheckbox">Lock On Failure</label>
+                    </div>
+                </div>
+
+                <div class="advanced-settings">
+                    <div class="setting-row">
+                        <label for="maxOpenCount">Max Open Count:</label>
+                        <input type="number" id="maxOpenCount" min="0" placeholder="Unlimited">
+                    </div>
+                    <div class="setting-row">
+                        <label for="expireOn">Expire On:</label>
+                        <input type="date" id="expireOn">
+                    </div>
+                    <div class="setting-row">
+                        <label for="maxFailAttempts">Max Failed Attempts:</label>
+                        <input type="number" id="maxFailAttempts" min="1" value="5">
+                    </div>
+                    <div class="setting-row">
+                        <label for="recipientRestrictions">Recipient Restrictions:</label>
+                        <select id="recipientRestrictions">
+                            <option value="none">None</option>
+                            <option value="domain">Same Domain Only</option>
+                            <option value="specific">Specific Recipients</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <section class="status-section">
+                <div id="statusMessage" class="status-message"></div>
+                <div id="policyStatus" class="policy-status"></div>
+            </section>
+        </div>
+
+        <div id="loader" class="loader-container" style="display: none;">
             <div class="loader-spinner"></div>
             <div class="loader-steps">
                 <p id="step1" class="loader-step">🔄 Checking Policy...</p>
                 <p id="step2" class="loader-step">🧠 Validating Email...</p>
-                <p id="step3" class="loader-step">🔐 Encrypting...</p>
-                <p id="step4" class="loader-step">📤 Sending Email...</p>
+                <p id="step3" class="loader-step">🔐 Applying IRM Controls...</p>
+                <p id="step4" class="loader-step">📤 Preparing to Send...</p>
             </div>
         </div>
     </div>
+
     <script src="taskpane.js"></script>
 </body>
 </html>
