@@ -5,11 +5,7 @@ Office.onReady((info) => {
         initializeMSAL();
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
 
-        
-        // Track installation and log info
-        trackInstallation().then(() => {
-            console.log('Add-in is running in the background.');
-        });
+        console.log('Add-in is running in the background.');
     }
 });
 
@@ -32,132 +28,13 @@ const regexPatterns = {
     ssnAustria: /[^\w-.;&](\d{4}[0-3]\d(0[1-9]|1[0-2])\d{2})[^\w-.;&]/,
     ibanAzerbaijan: /[^\w](AZ\d{2}(\s[A-Za-z0-9]{4}\s(\d{4}\s){4}\d{4}|[A-Za-z0-9]{4}\d{20}))[^\w]/,
 };
-// function checkFirstRun() {
-//     const isFirstRun = !localStorage.getItem('addinInstalled');
-//     if (isFirstRun) {
-//         localStorage.setItem('addinInstalled', 'true');
-//         return true;
-//     }
-//     return false;
-// }
-// async function sendInstallationData(payload) {
-//     try {
-//         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Installation', {
-//             method: 'POST',
-//             headers: { 
-//                 'Content-Type': 'application/json',
-//                 'Accept': 'application/json'
-//             },
-//             body: JSON.stringify(payload)
-//         });
-        
-//         if (!response.ok) {
-//             console.warn('Failed to send installation data:', response.status);
-//             return false;
-//         }
-//         return true;
-//     } catch (error) {
-//         console.error('Error tracking installation:', error);
-//         return false;
-//     }
-// }
 
-async function trackInstallation() {
-    // 1. Basic installation info
-    const userEmail = Office.context.mailbox.userProfile.emailAddress;
-    const domain = userEmail.split('@')[1] || 'unknown';
-    const installationData = {
-        timestamp: new Date().toISOString(),
-        userEmail: userEmail,
-        outlookVersion: Office.context.mailbox.diagnostics.hostVersion,
-        addinVersion: '1.0.0'
-    };
 
-    // 2. Check local storage first
-    const existingRegistration = localStorage.getItem('companyRegistration');
-    if (existingRegistration) {
-        const data = JSON.parse(existingRegistration);
-        if (data.status === 'registered') {
-            console.log('Company already registered for this installation');
-            return;
-        }
-    }
-
-    // 3. Prepare payload
-    const companyData = {
-        companyId: generateUUID(),
-        companyName: domain.split('.')[0] + ' (auto-detected)',
-        domainName: domain,
-        databaseName: `db_${domain.replace(/\./g, '_')}`,
-        licenseType: "Trial",
-        numberOfLicenses: 1,
-        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        message: "Auto-registered via Outlook add-in installation",
-        registeredByEmail: userEmail,
-        // Default empty values for required fields
-        city: "",
-        state: "",
-        country: "",
-        pin: "",
-        emailServiceProvider: 0
-    };
-
-    try {
-        // 4. Attempt registration
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                "X-Tenant-ID": "kriptone.com"
-            },
-            body: JSON.stringify(companyData)
-        });
-
-        if (response.ok) {
-            localStorage.setItem('companyRegistration', JSON.stringify({
-                ...installationData,
-                ...companyData,
-                status: 'registered'
-            }));
-            console.log('✅ Company registration successful');
-        } else if (response.status === 409) {
-            // Handle "already registered" case
-            const errorData = await response.json();
-            console.warn('⚠️ Company exists:', errorData.message);
-            
-            // Store as "verified" instead of "registered"
-            localStorage.setItem('companyRegistration', JSON.stringify({
-                ...installationData,
-                status: 'verified',
-                verificationDate: new Date().toISOString(),
-                serverMessage: errorData.message
-            }));
-            
-            // Optional: Show user-friendly notification
-            await showOutlookNotification(
-                "Welcome Back", 
-                "Your company is already registered in our system"
-            );
-        } else {
-            console.error('Registration failed:', response.status);
-        }
-    } catch (error) {
-        console.error('Registration error:', error);
-        // Store as "pending" for retry later
-        localStorage.setItem('companyRegistration', JSON.stringify({
-            ...installationData,
-            ...companyData,
-            status: 'pending',
-            lastAttempt: new Date().toISOString()
-        }));
-    }
-}
 async function onMessageSendHandler(eventArgs) {
     // Track execution time
     const startTime = Date.now();
     console.log('🚀 onMessageSendHandler started at:', new Date().toISOString());
-    
+
     try {
         // 1. Initialize MSAL if not already done
         if (!isInitialized) {
@@ -177,7 +54,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        
+
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
         console.log('📧 Processing mail item:', item.itemId);
@@ -228,12 +105,12 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-       
+
         // 7. Fetch policy settings
         console.log('⚖️ Fetching policy settings...');
         let policy;
         try {
-            policy = await fetchPolicyDomains(token);
+            policy = await fetchPolicyDomains(token, from);
             console.log('ℹ️ Policy settings:', {
                 allowedDomains: policy.allowedDomains?.length || 0,
                 blockedDomains: policy.blockedDomains?.length || 0,
@@ -250,33 +127,55 @@ async function onMessageSendHandler(eventArgs) {
         // 8. Apply domain restrictions if policy exists
         if (policy && (policy.allowedDomains?.length > 0 || policy.blockedDomains?.length > 0)) {
             console.log('🔒 Applying domain restrictions...');
-            const domainCheckResult = checkDomainRestrictions(
-                toRecipients, 
-                ccRecipients, 
-                bccRecipients, 
-                policy.allowedDomains, 
-                policy.blockedDomains
+
+            // Check if domain restrictions are enabled
+            if (policy.useAllowedDomains || policy.blockedDomains.length > 0) {
+                const domainCheckResult = checkDomainRestrictions(
+                    toRecipients,
+                    ccRecipients,
+                    bccRecipients,
+                    policy.allowedDomains,
+                    policy.blockedDomains,
+                    policy.useAllowedDomains
+                );
+
+                if (domainCheckResult.blocked) {
+                    console.warn(`❌ Blocked domain detected: ${domainCheckResult.domain}`);
+                    await showOutlookNotification(
+                        "Blocked Domain",
+                        `Cannot send to ${domainCheckResult.domain} per company policy`
+                    );
+                    eventArgs.completed({ allowEvent: false });
+                    return;
+                }
+            }
+
+            // Check if domain requires encryption
+            const requiresEncryption = policy.alwaysEncryptDomains.some(domain =>
+                getAllRecipients(toRecipients, ccRecipients, bccRecipients)
+                    .some(email => email.trim().endsWith(`@${domain}`))
             );
 
-            if (domainCheckResult.blocked) {
-                console.warn(`❌ Blocked domain detected: ${domainCheckResult.domain}`);
-                await showOutlookNotification(
-                    "Blocked Domain", 
-                    `Cannot send to ${domainCheckResult.domain} per company policy`
-                );
-                eventArgs.completed({ allowEvent: false });
-                return;
+            if (requiresEncryption) {
+                policy.encryptOutgoingEmails = true;
+                policy.encryptOutgoingAttachments = true;
             }
         }
-        
+
         // 9. Content scanning if enabled
         if (policy?.contentScanning) {
             console.log('🔎 Scanning email content...');
-            const contentScanResult = scanContent(body, subject, attachments);
+            const contentScanResult = scanContent(
+                body,
+                subject,
+                attachments,
+                policy.customRegexPatterns,
+                policy.sensitiveKeywords
+            );
             if (contentScanResult.found) {
                 console.warn(`❌ Restricted content found: ${contentScanResult.type}`);
                 await showOutlookNotification(
-                    "Restricted Content", 
+                    "Restricted Content",
                     `Cannot send: Email contains restricted ${contentScanResult.type}`
                 );
                 eventArgs.completed({ allowEvent: false });
@@ -287,48 +186,68 @@ async function onMessageSendHandler(eventArgs) {
         // 10. Attachment policy checks
         if (policy?.attachmentPolicy && attachments?.length > 0) {
             console.log('📎 Checking attachments...');
-            const attachmentCheckResult = checkAttachments(attachments, policy.blockedAttachments);
+
+            // Check attachment size
+            const sizeExceeded = attachments.some(att =>
+                att.size > (policy.maxAttachmentSizeMB * 1024 * 1024)
+            );
+            if (sizeExceeded) {
+                await showOutlookNotification(
+                    "Attachment Too Large",
+                    `Attachments exceed maximum size of ${policy.maxAttachmentSizeMB}MB`
+                );
+                eventArgs.completed({ allowEvent: false });
+                return;
+            }
+
+            // Check blocked attachment types
+            const attachmentCheckResult = checkAttachments(
+                attachments,
+                policy.blockedAttachments,
+                policy.allowedAttachments,
+                policy.requirePasswordProtectedAttachments
+            );
             if (attachmentCheckResult.blocked) {
                 console.warn(`❌ Blocked attachment: ${attachmentCheckResult.filename}`);
                 await showOutlookNotification(
-                    "Restricted Attachment", 
-                    `Cannot send: Attachment "${attachmentCheckResult.filename}" is restricted`
+                    "Restricted Attachment",
+                    `Cannot send: ${attachmentCheckResult.reason}`
                 );
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
         }
-        
+
         // 11. Prepare email data for API
         console.log('📦 Preparing email data for API...');
-       let emailData;
+        let emailData;
         try {
             emailData = await prepareEmailData(from, toRecipients, ccRecipients, bccRecipients, subject, body, attachments);
             // Detailed payload logging
-        console.group('📤 Email Data Payload');
-        console.log('📝 Basic Info:', {
-            id: emailData.id,
-            from: emailData.fromEmailID,
-            timestamp: emailData.timestamp,
-            subject: emailData.emailSubject,
-            bodyLength: emailData.emailBody.length
-        });
-        
-        console.log('👥 Recipients:', {
-            to: emailData.emailTo,
-            cc: emailData.emailCc,
-            bcc: emailData.emailBcc
-        });
-        
-        console.log('📎 Attachments:', emailData.attachments.map(att => ({
-            name: att.fileName,
-            size: att.fileSize,
-            type: att.fileType,
-            dataPreview: att.fileData?.substring(0, 50) + '...'
-        })));
-        
-        console.log('🔢 Full Payload Size:', JSON.stringify(emailData).length, 'bytes');
-        console.groupEnd();
+            console.group('📤 Email Data Payload');
+            console.log('📝 Basic Info:', {
+                id: emailData.id,
+                from: emailData.fromEmailID,
+                timestamp: emailData.timestamp,
+                subject: emailData.emailSubject,
+                bodyLength: emailData.emailBody.length
+            });
+
+            console.log('👥 Recipients:', {
+                to: emailData.emailTo,
+                cc: emailData.emailCc,
+                bcc: emailData.emailBcc
+            });
+
+            console.log('📎 Attachments:', emailData.attachments.map(att => ({
+                name: att.fileName,
+                size: att.fileSize,
+                type: att.fileType,
+                dataPreview: att.fileData?.substring(0, 50) + '...'
+            })));
+
+            console.log('🔢 Full Payload Size:', JSON.stringify(emailData).length, 'bytes');
+            console.groupEnd();
         } catch (error) {
             console.error("Error preparing email data:", error);
             await showOutlookNotification("Error", "Failed to prepare email for sending");
@@ -336,38 +255,44 @@ async function onMessageSendHandler(eventArgs) {
             return;
         }
 
-        // Handle encryption if required
+
+        // Replace the current encryption handling block with this:
         if (policy?.encryptOutgoingEmails || policy?.encryptOutgoingAttachments) {
             console.log("🔐 Beginning encryption process...");
-            
+
             try {
                 const encryptedResult = await getEncryptedEmail(emailData, token);
-                
-                // Additional validation of encrypted result
-                if (!encryptedResult?.encryptedFile) {
-                    throw new Error("Encryption service returned invalid data");
+
+                if (encryptedResult.encryptedAttachments?.length > 0) {
+                    console.log("✅ Encryption successful, updating email");
+
+                    // Use the instruction note as the new body content
+                    const newBodyContent = encryptedResult.instructionNote ||
+                        "<p>This email contains encrypted content. Please use the attached files to view the secure message.</p>";
+
+                    await updateEmailWithEncryptedContent(
+                        item,
+                        encryptedResult.encryptedAttachments,
+                        newBodyContent
+                    );
+
+                    eventArgs.completed({ allowEvent: true });
+                    return;
+                } else {
+                    console.warn("⚠️ Encryption required but no encrypted content returned");
+                    await showOutlookNotification(
+                        "Encryption Required",
+                        "This email requires encryption but the service is unavailable. Email not sent."
+                    );
+                    eventArgs.completed({ allowEvent: false });
+                    return;
                 }
-
-                console.log("ℹ️ Encryption result validated:", {
-                    dataLength: encryptedResult.encryptedFile.length,
-                    fileName: encryptedResult.fileName
-                });
-
-                await updateEmailWithEncryptedContent(item, encryptedResult);
-                eventArgs.completed({ allowEvent: true });
-                return;
-                
             } catch (encryptionError) {
                 console.error("❌ Encryption process failed:", encryptionError);
-                
-                let userMessage = "Failed to secure email. ";
-                if (encryptionError.message.includes("null") || encryptionError.message.includes("base64")) {
-                    userMessage += "Attachment processing failed. Please remove attachments and try again.";
-                } else {
-                    userMessage += "Please try again or contact support.";
-                }
-                
-                await showOutlookNotification("Encryption Failed", userMessage);
+                await showOutlookNotification(
+                    "Encryption Failed",
+                    "This email requires encryption but the service failed. Email not sent."
+                );
                 eventArgs.completed({ allowEvent: false });
                 return;
             }
@@ -375,28 +300,31 @@ async function onMessageSendHandler(eventArgs) {
 
 
         // 13. If no encryption needed, just save the email data
-        console.log('💾 Saving email data...');
-        try {
-            const saveResult = await saveEmailData(emailData, token);
-            if (!saveResult.success) {
-                throw new Error(saveResult.message || 'Unknown error saving email');
+        // Replace the current saveEmailData call with this:
+        if (!policy?.encryptOutgoingEmails && !policy?.encryptOutgoingAttachments) {
+            console.log('💾 Saving email data (non-encrypted path)...');
+            try {
+                const saveResult = await saveEmailData(emailData, token);
+                if (!saveResult.success) {
+                    console.error('❌ Failed to save email data:', saveResult.message);
+                    await showOutlookNotification("Warning", "Email will be sent but audit logging failed: " + saveResult.message);
+                }
+            } catch (error) {
+                console.error('❌ Failed to save email data:', error);
+                // Fail open - allow sending even if saving fails
+                console.warn('⚠️ Allowing send despite save failure');
             }
-            console.log('✅ Email data saved successfully');
-        } catch (error) {
-            console.error('❌ Failed to save email data:', error);
-            // Fail open - allow sending even if saving fails
-            console.warn('⚠️ Allowing send despite save failure');
         }
 
         // 14. All checks passed - allow the email to send
         console.log('✅ All checks passed - allowing send');
-        await showInfo("Success", "Email Send successfully.");
+        await showSuccessNotification("Email sent successfully");
         eventArgs.completed({ allowEvent: true });
 
     } catch (error) {
         console.error('❌ Unhandled error in onMessageSendHandler:', error);
         await showOutlookNotification(
-            "Error", 
+            "Error",
             "An unexpected error occurred while sending the email. Please try again."
         );
         eventArgs.completed({ allowEvent: false });
@@ -411,85 +339,89 @@ async function onMessageSendHandler(eventArgs) {
  * Validates all recipient email addresses
  */
 function validateEmailRecipients(to, cc, bcc) {
-    const validate = (recipients) => 
+    const validate = (recipients) =>
         !recipients || recipients.split(',').every(email => emailRegex.test(email.trim()));
-    
+
     return validate(to) && validate(cc) && validate(bcc);
 }
 
-/**
- * Checks domain restrictions against policy
- */
-function checkDomainRestrictions(to, cc, bcc, allowedDomains, blockedDomains) {
-    const allRecipients = [
-        ...(to ? to.split(',') : []),
-        ...(cc ? cc.split(',') : []),
-        ...(bcc ? bcc.split(',') : [])
-    ].map(e => e.trim());
+function getAllRecipients(to, cc, bcc) {
+    return [
+        ...(to ? to.split(',').filter(e => e.trim()) : []),
+        ...(cc ? cc.split(',').filter(e => e.trim()) : []),
+        ...(bcc ? bcc.split(',').filter(e => e.trim()) : [])
+    ];
+}
+
+// Update checkDomainRestrictions to handle allow/block lists
+function checkDomainRestrictions(to, cc, bcc, allowedDomains, blockedDomains, useAllowList) {
+    const allRecipients = getAllRecipients(to, cc, bcc);
 
     for (const email of allRecipients) {
-        const domain = email.split('@')[1];
-        
-        // Check blocked domains first
-        if (blockedDomains?.includes(domain)) {
-            return { blocked: true, domain };
+        const domain = email.split('@')[1]?.toLowerCase();
+        if (!domain) continue;
+
+        // Check against block list first
+        if (blockedDomains.includes(domain)) {
+            return { blocked: true, domain, reason: 'blocked by policy' };
         }
-        
-        // If allowed domains exist, enforce whitelist
-        if (allowedDomains?.length > 0 && !allowedDomains.includes(domain)) {
-            return { blocked: true, domain };
+
+        // Check against allow list if enabled
+        if (useAllowList && !allowedDomains.includes(domain)) {
+            return { blocked: true, domain, reason: 'not in allowed domains' };
         }
     }
-    
+
     return { blocked: false };
 }
 
-/**
- * Scans email content for restricted patterns
- */
-function scanContent(body, subject, attachments) {
+
+function scanContent(body, subject, attachments, customPatterns = [], keywords = []) {
     const textToScan = `${subject} ${body}`.toLowerCase();
-    
-    // Check each regex pattern
-    for (const [type, pattern] of Object.entries(regexPatterns)) {
-        if (pattern.test(textToScan)) {
-            return { found: true, type };
+
+    // Check custom regex patterns from policy
+    for (const pattern of customPatterns) {
+        try {
+            const regex = new RegExp(pattern, 'i');
+            if (regex.test(textToScan)) {
+                return { found: true, type: 'custom policy violation' };
+            }
+        } catch (e) {
+            console.warn('Invalid regex pattern:', pattern);
         }
     }
-    
+
+    // Check sensitive keywords
+    for (const keyword of keywords) {
+        if (textToScan.includes(keyword.toLowerCase())) {
+            return { found: true, type: `sensitive keyword: ${keyword}` };
+        }
+    }
+
     // Check attachment names
     for (const attachment of attachments || []) {
         if (regexPatterns.attachmentName.test(attachment.name)) {
             return { found: true, type: 'attachment: ' + attachment.name };
         }
     }
-    
+
     return { found: false };
 }
 
-/**
- * Checks attachments against blocked types
- */
-function checkAttachments(attachments, blockedTypes = []) {
-    for (const attachment of attachments) {
-        const ext = attachment.name.split('.').pop().toLowerCase();
-        if (blockedTypes.includes(ext)) {
-            return { blocked: true, filename: attachment.name };
-        }
-    }
-    return { blocked: false };
-}
 
 /**
  * Updates the email with encrypted content
  */
-async function updateEmailWithEncryptedContent(item, apiResponse) {
+async function updateEmailWithEncryptedContent(item, encryptedAttachments, newBodyContent) {
     try {
-        // 1. Update email body
+        // 1. First update the body with the instruction note
         await new Promise((resolve, reject) => {
             item.body.setAsync(
-                apiResponse.instructionNote,
-                { coercionType: Office.CoercionType.Html },
+                newBodyContent,
+                {
+                    coercionType: Office.CoercionType.Html,
+                    asyncContext: null
+                },
                 (result) => {
                     if (result.status === Office.AsyncResultStatus.Succeeded) {
                         resolve();
@@ -501,60 +433,47 @@ async function updateEmailWithEncryptedContent(item, apiResponse) {
         });
 
         // 2. Remove existing attachments
-        const currentAttachments = await new Promise(resolve => {
-            item.getAttachmentsAsync(resolve);
-        });
+        if (encryptedAttachments && encryptedAttachments.length > 0) {
+            const currentAttachments = await new Promise(resolve => {
+                item.getAttachmentsAsync(resolve);
+            });
 
-        if (currentAttachments.value?.length > 0) {
-            await Promise.all(currentAttachments.value.map(att => 
-                new Promise(resolve => {
-                    item.removeAttachmentAsync(att.id, resolve);
-                })
-            ));
-        }
-
-        // 3. Add new attachments with validation
-        if (!apiResponse.encryptedAttachments || apiResponse.encryptedAttachments.length === 0) {
-            console.warn("No attachments in API response");
-            return;
-        }
-
-        for (const attachment of apiResponse.encryptedAttachments) {
-            const fileName = attachment.fileName || "secure-file.ksf";
-            console.log("🔍 Processing attachment:", fileName);
-            if (!attachment.fileData || typeof attachment.fileData !== 'string') {
-                console.error("❌ Invalid attachment data for:", fileName);
-                continue;
+            if (currentAttachments.value?.length > 0) {
+                await Promise.all(currentAttachments.value.map(att =>
+                    new Promise(resolve => {
+                        item.removeAttachmentAsync(att.id, resolve);
+                    })
+                ));
             }
 
-            // Clean the Base64 string if needed
-            const cleanBase64 = attachment.fileData.replace(/^data:[^;]+;base64,/, '');
 
-            await new Promise((resolve, reject) => {
-                item.addFileAttachmentFromBase64Async(
-                    cleanBase64,
-                    fileName,
-                    { isInline: false },
-                    (result) => {
-                        if (result.status === Office.AsyncResultStatus.Succeeded) {
-                            console.log(`✅ Added attachment: ${attachment.fileName}`);
-                            resolve();
-                        } else {
-                            console.error(`❌ Failed to add attachment ${attachment.fileName}:`, result.error);
-                            reject(new Error(`Failed to add attachment ${attachment.fileName}: ${result.error.message}`));
-                        }
-                    }
-                );
-            });
+            // 3. Add new encrypted attachments
+            for (const attachment of encryptedAttachments) {
+                if (attachment.fileData) {
+                    // Ensure we have clean base64 data (remove data URI prefix if present)
+                    const cleanBase64 = attachment.fileData.replace(/^data:[^;]+;base64,/, '');
+
+                    await new Promise((resolve, reject) => {
+                        item.addFileAttachmentFromBase64Async(
+                            cleanBase64,
+                            attachment.fileName || "encrypted-file.ksf",
+                            { isInline: false },
+                            (result) => {
+                                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                                    resolve();
+                                } else {
+                                    reject(new Error(`Failed to add attachment: ${result.error.message}`));
+                                }
+                            }
+                        );
+                    });
+                }
+            }
         }
 
-        console.log("✅ Email successfully updated with secure content");
+        console.log("✅ Email processed with encryption settings");
     } catch (error) {
-        console.error("❌ Failed to update email:", {
-            error: error.message,
-            stack: error.stack,
-            apiResponse: apiResponse
-        });
+        console.error("❌ Failed to update email:", error);
         throw error;
     }
 }
@@ -578,80 +497,157 @@ async function getUserDetails(accessToken) {
     }
 }
 
-// Fetch policy domains from the backend with robust error handling
-async function fetchPolicyDomains(token) {
+// Update the fetchPolicyDomains function to match the new response structure
+async function fetchPolicyDomains(token, from) {
     try {
         console.log('🔍 Fetching policy from API...');
-        const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Policy', {
+        const response = await fetch(`https://kntrolemail.kriptone.com:6677/api/Policy/GetPolicyByEmailAsync/${from}`, {
             method: 'GET',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Accept': 'application/json', 
-                'Authorization': `Bearer ${token}`, 
-                "X-Tenant-ID": "kriptone.com" 
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                "X-Tenant-ID": "kriptone.com"
             },
         });
-
-        // First check if the response exists and is OK
-        if (!response) {
-            throw new Error('No response received from policy API');
-        }
 
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Policy API responded with status ${response.status}: ${errorText}`);
         }
 
-        // Try to parse JSON
-        let json;
-        try {
-            json = await response.json();
-            console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
-        } catch (parseError) {
-            throw new Error(`Failed to parse policy API response: ${parseError.message}`);
+        const responseData = await response.json();
+
+        // Check if the response contains the data object
+        if (!responseData.success || !responseData.data) {
+            throw new Error('Invalid policy API response structure');
         }
 
-        // Handle empty array response
-        if (!json || !Array.isArray(json) || json.length === 0) {
-            console.warn('⚠️ Policy API returned empty array, using default policy');
-            return getDefaultPolicy();
-        }
+        const policy = responseData.data;
+        console.log("🔹 Policy Response:", policy);
 
-        // Safely extract the first policy with fallbacks
-        const policy = json[0] || {};
-        
-        // Validate and normalize the policy structure
+        // Map the API response to our expected format
         return {
-            allowedDomains: Array.isArray(policy.allowedDomains) ? policy.allowedDomains : [],
-            blockedDomains: Array.isArray(policy.blockedDomains) ? policy.blockedDomains : [],
-            contentScanning: Boolean(policy.contentScanning),
-            attachmentPolicy: Boolean(policy.attachmentPolicy),
-            blockedAttachments: Array.isArray(policy.blockedAttachments) ? policy.blockedAttachments : [],
-            encryptOutgoingEmails: Boolean(policy.encryptOutgoingEmails),
-            encryptOutgoingAttachments: Boolean(policy.encryptOutgoingAttachments)
+            // Basic policy info
+            policyName: policy.policyName || 'Default Policy',
+            isEnabled: policy.isEnabled !== false, // Default to true if not specified
+            enableIRM: policy.enableIRM === true,
+            enableLogging: policy.enableLogging === true,
+
+            // Domain policy
+            allowedDomains: policy.domainPolicy?.allowedDomains || [],
+            blockedDomains: policy.domainPolicy?.blockedDomains || [],
+            alwaysEncryptDomains: policy.domainPolicy?.alwaysEncryptDomains || [],
+            useAllowedDomains: policy.domainPolicy?.useAllowedDomains === true,
+
+            // Attachment policy
+            attachmentPolicy: policy.attachmentPolicy?.useAllowedAttachments === true,
+            allowedAttachments: policy.attachmentPolicy?.allowedAttachments || [],
+            blockedAttachments: policy.attachmentPolicy?.blockedAttachments || [],
+            maxAttachmentSizeMB: policy.attachmentPolicy?.maxAttachmentSizeMB || 10,
+            encryptOutgoingAttachments: policy.attachmentPolicy?.encryptOutgoingAttachments === true,
+            requirePasswordProtectedAttachments: policy.attachmentPolicy?.requirePasswordProtectedAttachments === true,
+
+            // Regex/content scanning
+            contentScanning: policy.regexPolicy?.contentScanning === true,
+            customRegexPatterns: policy.regexPolicy?.customRegexPatterns || [],
+            sensitiveKeywords: policy.regexPolicy?.sensitiveKeywords || [],
+
+            // Encryption policy
+            encryptOutgoingEmails: policy.encryptionPolicy?.encryptOutgoingEmails === true,
+            enableEncryption: policy.encryptionPolicy?.enableEncryption === true,
+
+            // IRM policy
+            irmPolicy: policy.irmPolicy ? {
+                expiryDate: policy.irmPolicy.expiryDate,
+                maxOpenCount: policy.irmPolicy.maxOpenCount,
+                maxFailedAttempts: policy.irmPolicy.maxFailedAttempts,
+                lockOnFailure: policy.irmPolicy.lockOnFailure === true,
+                blockCopy: policy.irmPolicy.blockCopy === true,
+                blockPrint: policy.irmPolicy.blockPrint === true,
+                blockSaveAs: policy.irmPolicy.blockSaveAs === true,
+                blockEdit: policy.irmPolicy.blockEdit === true,
+                blockScreenCapture: policy.irmPolicy.blockScreenCapture === true,
+                allowedUsers: policy.irmPolicy.allowedUsers || [],
+                allowedLocations: policy.irmPolicy.allowedLocations || [],
+                blockedLocations: policy.irmPolicy.blockedLocations || []
+            } : null
         };
 
     } catch (error) {
-        console.error("❌ Error fetching policy:", {
-            error: error.message,
-            stack: error.stack
-        });
-        
-        // Return a default policy that's secure but permissive enough
+        console.error("❌ Error fetching policy:", error);
         return getDefaultPolicy();
     }
 }
 
 // Default policy to use when API fails or returns empty
+function checkAttachments(attachments, blockedTypes = [], allowedTypes = [], requirePassword = false) {
+    for (const attachment of attachments) {
+        const ext = `.${attachment.name.split('.').pop().toLowerCase()}`;
+
+        // Check blocked extensions
+        if (blockedTypes.includes(ext)) {
+            return {
+                blocked: true,
+                filename: attachment.name,
+                reason: `Attachment type ${ext} is blocked by policy`
+            };
+        }
+
+        // Check if using allow list and attachment not in it
+        if (allowedTypes.length > 0 && !allowedTypes.includes(ext)) {
+            return {
+                blocked: true,
+                filename: attachment.name,
+                reason: `Attachment type ${ext} is not allowed by policy`
+            };
+        }
+
+        // Check for password protection requirement
+        if (requirePassword && !attachment.isPasswordProtected) {
+            return {
+                blocked: true,
+                filename: attachment.name,
+                reason: 'Attachment must be password protected'
+            };
+        }
+    }
+    return { blocked: false };
+}
+
+// Update the getDefaultPolicy function
 function getDefaultPolicy() {
     return {
-        allowedDomains: [], // Empty means no domain restrictions
-        blockedDomains: [], // Empty means no blocked domains
-        contentScanning: true, // Enable content scanning by default for safety
-        attachmentPolicy: true, // Enable attachment policy by default
-        blockedAttachments: ['exe', 'bat', 'sh', 'dll', 'msi'], // Common dangerous extensions
-        encryptOutgoingEmails: false, // Disable by default to avoid blocking emails
-        encryptOutgoingAttachments: false // Disable by default
+        policyName: 'Default Security Policy',
+        isEnabled: true,
+        enableIRM: false,
+        enableLogging: true,
+
+        // Domain policy defaults
+        allowedDomains: [],
+        blockedDomains: [],
+        alwaysEncryptDomains: [],
+        useAllowedDomains: false,
+
+        // Attachment policy defaults
+        attachmentPolicy: true,
+        allowedAttachments: ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.png'],
+        blockedAttachments: ['.exe', '.bat', '.sh', '.dll', '.msi'],
+        maxAttachmentSizeMB: 10,
+        encryptOutgoingAttachments: false,
+        requirePasswordProtectedAttachments: false,
+
+        // Content scanning defaults
+        contentScanning: true,
+        customRegexPatterns: [],
+        sensitiveKeywords: ['confidential', 'proprietary', 'secret'],
+
+        // Encryption defaults
+        encryptOutgoingEmails: false,
+        enableEncryption: false,
+
+        // IRM defaults
+        irmPolicy: null
     };
 }
 async function getEncryptedEmail(emailDataDto, token) {
@@ -687,9 +683,9 @@ async function getEncryptedEmail(emailDataDto, token) {
         }
 
         return {
-            encryptedFile: responseData.encryptedAttachments[0].fileData,
-            fileName: responseData.encryptedAttachments[0].fileName || "secure-message.ksf",
-            instructionNote: responseData.instructionNote || "Secure email content"
+            encryptedAttachments: responseData.encryptedAttachments || [],
+            instructionNote: responseData.instructionNote,
+            encryptedEmailBody: responseData.encryptedEmailBody
         };
 
     } catch (error) {
@@ -709,25 +705,61 @@ async function getEncryptedEmail(emailDataDto, token) {
         throw error;
     }
 }
-async function saveEmailData(emailData,token) {
+async function saveEmailData(emailData, token) {
     try {
+        console.log("📤 Attempting to save email data...");
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json','Authorization': `Bearer ${token}`,"X-Tenant-ID": "kriptone.com", },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                "X-Tenant-ID": "kriptone.com"
+            },
             body: JSON.stringify(emailData),
         });
 
-        const json = await response.json();
-        console.log("🔹 Raw API Response:", JSON.stringify(json, null, 2));
+        // First check if we got any response
+        if (!response) {
+            throw new Error("No response received from server");
+        }
+
+        // Try to parse JSON response
+        let json;
+        try {
+            json = await response.json();
+            console.log("🔹 API Response:", json);
+        } catch (parseError) {
+            // If JSON parsing fails, get the text response
+            const textResponse = await response.text();
+            throw new Error(`Invalid JSON response: ${textResponse}`);
+        }
+
+        // Check if response indicates success
+        if (!response.ok) {
+            throw new Error(json.message || `Server returned status ${response.status}`);
+        }
+
         return {
-            success: response.ok && json.success,
-            message: json.message || "Unknown error",
+            success: true,
+            message: json.message || "Email data saved successfully"
         };
     } catch (error) {
-        console.error("❌ Error saving email data:", error);
+        console.error("❌ Detailed save error:", {
+            error: error.message,
+            requestPayload: {
+                ...emailData,
+                attachments: emailData.attachments.map(att => ({
+                    fileName: att.fileName,
+                    size: att.fileSize,
+                    type: att.fileType,
+                    dataLength: att.fileData?.length || 0
+                }))
+            }
+        });
         return {
             success: false,
-            message: "Unable to connect to the server. Please try again later.",
+            message: error.message || "Failed to save email data"
         };
     }
 }
@@ -763,7 +795,7 @@ async function prepareEmailData(from, to, cc, bcc, subject, body, attachments) {
 
         try {
             const base64Data = await getAttachmentBase64Fallback(attachment);
-            
+
             if (!base64Data) {
                 throw new Error("Attachment returned empty data");
             }
@@ -825,7 +857,7 @@ async function getAttachmentBase64Fallback(attachment) {
         );
     });
 }
-  
+
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -865,11 +897,23 @@ function getAttachmentsAsync(item) {
     });
 }
 
+
 async function showOutlookNotification(title, message) {
     Office.context.mailbox.item.notificationMessages.addAsync("error", {
         type: "errorMessage",
         message: `${title}: ${message}`,
     });
+}
+async function showSuccessNotification(message) {
+    try {
+        await Office.context.mailbox.item.notificationMessages.addAsync("success", {
+            type: "informationalMessage",
+            message: `Success: ${message}`
+        });
+        console.log(`✅ Success notification shown: ${message}`);
+    } catch (error) {
+        console.error("❌ Failed to show success notification:", error);
+    }
 }
 
 // MSAL Configuration
@@ -885,27 +929,6 @@ const msalConfig = {
     }
 };
 
-// Request these additional scopes when needed
-const requiredScopes = {
-    basic: ["User.Read", "Mail.Send"],
-    companyInfo: ["User.Read", "Organization.Read.All", "Directory.Read.All"]
-};
-
-async function requestAdminConsent() {
-    try {
-        const request = {
-            scopes: requiredScopes.companyInfo,
-            prompt: 'admin_consent'
-        };
-        
-        await msalInstance.loginPopup(request);
-        console.log('Admin consent granted');
-        return true;
-    } catch (error) {
-        console.error('Admin consent failed:', error);
-        return false;
-    }
-}
 // MSAL instance and state
 let msalInstance;
 let isInitialized = false;
@@ -1073,70 +1096,3 @@ async function fetchEmails(token) {
     }
 }
 
-// Track first run and installation
-function checkFirstRun() {
-    const isFirstRun = !localStorage.getItem('addinInstalled');
-    if (isFirstRun) {
-        localStorage.setItem('addinInstalled', 'true');
-        return true;
-    }
-    return false;
-}
-
-// Get basic company info from email domain
-function getBasicCompanyInfo() {
-    const email = Office.context.mailbox.userProfile.emailAddress;
-    const domain = email.split('@')[1];
-    return {
-        domain: domain,
-        userEmail: email,
-        timestamp: new Date().toISOString()
-    };
-}
-
-// // Enhanced company info using Microsoft Graph
-// async function getEnhancedCompanyInfo(token) {
-//     try {
-//         // Get organization details
-//         const orgResponse = await fetch('https://graph.microsoft.com/v1.0/organization', {
-//             headers: { 'Authorization': `Bearer ${token}` }
-//         });
-//         const orgData = await orgResponse.json();
-//         console.log('Organization Info:', orgData.value[0]);
-//         // Get tenant admin (requires admin consent)
-//         const adminsResponse = await fetch('https://graph.microsoft.com/v1.0/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members', {
-//             headers: { 'Authorization': `Bearer ${token}` }
-//         });
-//         const adminsData = await adminsResponse.json();
-        
-//         return {
-//             companyName: orgData.value[0]?.displayName || '',
-//             verifiedDomains: orgData.value[0]?.verifiedDomains || [],
-//             primaryAdmin: adminsData.value[0] ? {
-//                 name: adminsData.value[0].displayName,
-//                 email: adminsData.value[0].mail || adminsData.value[0].userPrincipalName
-//             } : null
-//         };
-//     } catch (error) {
-//         console.error("Couldn't fetch full company info:", error);
-//         return null;
-//     }
-// }
-
-// // Send installation data to your backend
-// async function sendInstallationData(payload) {
-//     try {
-//         const response = await fetch('https://your-backend-api.com/track-install', {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify(payload)
-//         });
-        
-//         if (!response.ok) {
-//             console.warn('Failed to send installation data:', response.status);
-//         }
-//     } catch (error) {
-//         console.error('Error tracking installation:', error);
-//     }
-// }
- 
