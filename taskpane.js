@@ -687,7 +687,7 @@ async function updateEmailWithEncryptedContent(item, encryptedAttachments, instr
 // Get encrypted email from service
 async function getEncryptedEmail(emailDataDto, token) {
     try {
-        const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email/Encrypt", {
+        const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
