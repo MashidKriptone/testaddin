@@ -643,7 +643,22 @@ function getAttachmentBase64(attachment) {
 async function updateEmailWithEncryptedContent(item, encryptedAttachments, instructionNote) {
     try {
         // Update the body with the instruction note
-        await item.body.setAsync(instructionNote, { coercionType: Office.CoercionType.Html });
+        await new Promise((resolve, reject) => {
+            item.body.setAsync(
+                instructionNote,
+                {
+                    coercionType: Office.CoercionType.Html,
+                    asyncContext: null
+                },
+                (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to update body: ${result.error.message}`));
+                    }
+                }
+            );
+        });
 
         // Remove existing attachments
         const currentAttachments = await new Promise(resolve => {
