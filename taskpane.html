@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -9,6 +10,7 @@
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.24.0/js/msal-browser.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -27,7 +29,8 @@
 
         <div id="mainContent" style="display:none;">
             <section class="description">
-                <p>KntrolEMAIL helps you manage and monitor email content with advanced IRM controls before sending. It ensures compliance with your organization's security policies.</p>
+                <p>KntrolEMAIL helps you manage and monitor email content with advanced IRM controls before sending. It
+                    ensures compliance with your organization's security policies.</p>
             </section>
 
             <section class="irm-controls">
@@ -44,6 +47,10 @@
                     <div class="control-item">
                         <input type="checkbox" id="blockSaveAsCheckbox" class="irm-checkbox">
                         <label for="blockSaveAsCheckbox">Block SaveAs</label>
+                    </div>
+                    <div class="control-item">
+                        <input type="checkbox" id="sendAckCheckbox" class="irm-checkbox">
+                        <label for="sendAckCheckbox">Send me access acknowledgement</label>
                     </div>
                 </div>
 
@@ -106,4 +113,5 @@
 
     <script src="taskpane.js"></script>
 </body>
+
 </html>

@@ -37,6 +37,7 @@ let irmSettings = {
     blockEdit: false,
     blockScreenCapture: false,
     lockOnFailure: false,
+    sendAccessAck: false,
     maxOpenCount: null,
     expireOn: null,
     maxFailAttempts: 5,
@@ -86,7 +87,7 @@ function initializeUI() {
     document.getElementById("blockEditCheckbox").addEventListener("change", () => toggleIRMControl('blockEdit'));
     document.getElementById("blockScreenCaptureCheckbox").addEventListener("change", () => toggleIRMControl('blockScreenCapture'));
     document.getElementById("lockOnFailureCheckbox").addEventListener("change", () => toggleIRMControl('lockOnFailure'));
-    
+    document.getElementById("sendAckCheckbox").addEventListener("change", () => toggleIRMControl('sendAccessAck'));
     document.getElementById("maxOpenCount").addEventListener("change", updateIRMSettings);
     document.getElementById("expireOn").addEventListener("change", updateIRMSettings);
     document.getElementById("maxFailAttempts").addEventListener("change", updateIRMSettings);
@@ -110,7 +111,7 @@ function toggleIRMControl(controlName) {
     irmSettings[controlName] = !irmSettings[controlName];
     updateIRMUI();
     updateIRMSettings();
-    
+
     // Show notification
     const controlLabels = {
         blockCopy: "Copy Protection",
@@ -118,9 +119,10 @@ function toggleIRMControl(controlName) {
         blockSaveAs: "SaveAs Protection",
         blockEdit: "Edit Protection",
         blockScreenCapture: "Screen Capture Protection",
-        lockOnFailure: "Lock On Failure"
+        lockOnFailure: "Lock On Failure",
+        sendAccessAck: "Access Acknowledgement"
     };
-    
+
     showNotification(`${controlLabels[controlName]} ${irmSettings[controlName] ? "enabled" : "disabled"}`);
 }
 
@@ -132,7 +134,7 @@ function updateIRMUI() {
     document.getElementById("blockEditCheckbox").checked = irmSettings.blockEdit;
     document.getElementById("blockScreenCaptureCheckbox").checked = irmSettings.blockScreenCapture;
     document.getElementById("lockOnFailureCheckbox").checked = irmSettings.lockOnFailure;
-    
+    document.getElementById("sendAckCheckbox").checked = irmSettings.sendAccessAck;
     document.getElementById("maxOpenCount").value = irmSettings.maxOpenCount || "";
     document.getElementById("expireOn").value = irmSettings.expireOn || "";
     document.getElementById("maxFailAttempts").value = irmSettings.maxFailAttempts;
@@ -141,15 +143,15 @@ function updateIRMUI() {
 
 // Update IRM settings from UI
 function updateIRMSettings() {
-    irmSettings.maxOpenCount = document.getElementById("maxOpenCount").value ? 
+    irmSettings.maxOpenCount = document.getElementById("maxOpenCount").value ?
         parseInt(document.getElementById("maxOpenCount").value) : null;
-    
+
     irmSettings.expireOn = document.getElementById("expireOn").value || null;
-    
+
     irmSettings.maxFailAttempts = parseInt(document.getElementById("maxFailAttempts").value) || 5;
-    
+
     irmSettings.recipientRestrictions = document.getElementById("recipientRestrictions").value;
-    
+
     console.log("Updated IRM settings:", irmSettings);
 }
 
@@ -300,7 +302,7 @@ async function fetchPolicySettings() {
         currentPolicy = mapPolicyResponse(responseData.data);
         applyPolicyToUI(currentPolicy);
         irmSettings.policyApplied = true;
-        
+
         updateStatus("Policy settings loaded successfully", "success");
         hideLoader();
     } catch (error) {
@@ -462,7 +464,7 @@ async function onMessageSendHandler(eventArgs) {
 
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
-        
+
         // 4. Apply IRM settings to the email
         await applyIRMSettingsToEmail(item);
 
@@ -473,14 +475,14 @@ async function onMessageSendHandler(eventArgs) {
         if (currentPolicy?.encryptOutgoingEmails || currentPolicy?.encryptOutgoingAttachments) {
             try {
                 const encryptedResult = await getEncryptedEmail(emailData, token);
-                
+
                 if (encryptedResult.encryptedAttachments?.length > 0) {
                     await updateEmailWithEncryptedContent(
                         item,
                         encryptedResult.encryptedAttachments,
                         encryptedResult.instructionNote || "<p>This email contains encrypted content.</p>"
                     );
-                    
+
                     eventArgs.completed({ allowEvent: true });
                     return;
                 } else {
@@ -530,7 +532,7 @@ async function onMessageSendHandler(eventArgs) {
 async function applyIRMSettingsToEmail(item) {
     // Get the current body
     const body = await getBodyAsync(item);
-    
+
     // Add IRM markers to the email body
     let newBody = body;
     if (irmSettings.blockCopy) newBody += "\n<!-- IRM:COPY_PROTECTED -->";
@@ -543,16 +545,17 @@ async function applyIRMSettingsToEmail(item) {
     if (irmSettings.expireOn) newBody += `\n<!-- IRM:EXPIRE_ON:${irmSettings.expireOn} -->`;
     if (irmSettings.recipientRestrictions !== "none") {
         newBody += `\n<!-- IRM:RECIPIENT_RESTRICTIONS:${irmSettings.recipientRestrictions} -->`;
+        if (irmSettings.sendAccessAck) newBody += "\n<!-- IRM:SEND_ACCESS_ACK -->";
     }
 
     // Update the email body
     await item.body.setAsync(newBody, { coercionType: Office.CoercionType.Html });
-    
+
     // Set custom properties
     const props = await new Promise(resolve => {
         item.loadCustomPropertiesAsync(resolve);
     });
-    
+
     if (props.status === Office.AsyncResultStatus.Succeeded) {
         const customProps = props.value;
         customProps.set("irmBlockCopy", irmSettings.blockCopy);
@@ -561,11 +564,12 @@ async function applyIRMSettingsToEmail(item) {
         customProps.set("irmBlockEdit", irmSettings.blockEdit);
         customProps.set("irmBlockScreenCapture", irmSettings.blockScreenCapture);
         customProps.set("irmLockOnFailure", irmSettings.lockOnFailure);
+        customProps.set("irmSendAccessAck", irmSettings.sendAccessAck);
         customProps.set("irmMaxOpenCount", irmSettings.maxOpenCount);
         customProps.set("irmExpireOn", irmSettings.expireOn);
         customProps.set("irmMaxFailAttempts", irmSettings.maxFailAttempts);
         customProps.set("irmRecipientRestrictions", irmSettings.recipientRestrictions);
-        
+
         await new Promise(resolve => {
             customProps.saveAsync(resolve);
         });
@@ -777,35 +781,35 @@ async function getUserDetails(accessToken) {
 // Helper functions for getting email details
 function getFromAsync(item) {
     return new Promise((resolve, reject) => {
-        item.from.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ? 
+        item.from.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ?
             resolve(result.value.emailAddress) : reject(result.error));
     });
 }
 
 function getRecipientsAsync(recipients) {
     return new Promise((resolve, reject) => {
-        recipients.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ? 
+        recipients.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ?
             resolve(result.value.map(r => r.emailAddress).join(", ")) : reject(result.error));
     });
 }
 
 function getSubjectAsync(item) {
     return new Promise((resolve, reject) => {
-        item.subject.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ? 
+        item.subject.getAsync(result => result.status === Office.AsyncResultStatus.Succeeded ?
             resolve(result.value) : reject(result.error));
     });
 }
 
 function getBodyAsync(item) {
     return new Promise((resolve, reject) => {
-        item.body.getAsync(Office.CoercionType.Text, result => result.status === Office.AsyncResultStatus.Succeeded ? 
+        item.body.getAsync(Office.CoercionType.Text, result => result.status === Office.AsyncResultStatus.Succeeded ?
             resolve(result.value) : reject(result.error));
     });
 }
 
 function getAttachmentsAsync(item) {
     return new Promise((resolve, reject) => {
-        item.getAttachmentsAsync(result => result.status === Office.AsyncResultStatus.Succeeded ? 
+        item.getAttachmentsAsync(result => result.status === Office.AsyncResultStatus.Succeeded ?
             resolve(result.value) : reject(result.error));
     });
 }
@@ -815,7 +819,7 @@ function showNotification(message, type = "info") {
     const statusMessage = document.getElementById("statusMessage");
     statusMessage.textContent = message;
     statusMessage.className = `status-message ${type}`;
-    
+
     // Auto-hide after 5 seconds
     setTimeout(() => {
         if (statusMessage.textContent === message) {
@@ -841,7 +845,7 @@ function hideLoader() {
 }
 
 function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });

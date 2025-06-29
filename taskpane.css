@@ -185,3 +185,9 @@ header {
         width: 100%;
     }
 }
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
