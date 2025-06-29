@@ -17,7 +17,6 @@ const msalConfig = {
         clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
         authority: "https://login.microsoftonline.com/common",
         redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html", // Use dynamic origin
-        knownAuthorities: ["login.microsoftonline.com"] // Add known authorities
     },
     cache: {
         cacheLocation: "sessionStorage",
