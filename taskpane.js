@@ -16,11 +16,22 @@ const msalConfig = {
     auth: {
         clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
         authority: "https://login.microsoftonline.com/common",
-        redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html"
+        redirectUri: window.location.origin + "/redirect.html", // Use dynamic origin
+        knownAuthorities: ["login.microsoftonline.com"] // Add known authorities
     },
     cache: {
         cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: true
+        storeAuthStateInCookie: true,
+        secureCookies: true
+    },
+    system: {
+        loggerOptions: {
+            loggerCallback: (level, message, containsPii) => {
+                if (containsPii) return;
+                console.log(`MSAL ${level}: ${message}`);
+            },
+            logLevel: msal.LogLevel.Verbose
+        }
     }
 };
 
@@ -107,25 +118,47 @@ function registerIRMFunctions() {
 }
 
 // Toggle IRM control
-function toggleIRMControl(controlName) {
-    irmSettings[controlName] = !irmSettings[controlName];
-    updateIRMUI();
-    updateIRMSettings();
+async function toggleIRMControl(controlName) {
+    try {
+        showLoader(`KntrolEMAIL is working on your ${controlName.replace('block', 'Block ')} request...`);
+        
+        // First verify we have a valid token
+        try {
+            await getAccessToken();
+        } catch (authError) {
+            console.error("Authentication failed:", authError);
+            showNotification("Authentication required. Please sign in first.", "error");
+            hideLoader();
+            return;
+        }
 
-    // Show notification
-    const controlLabels = {
-        blockCopy: "Copy Protection",
-        blockPrint: "Print Protection",
-        blockSaveAs: "SaveAs Protection",
-        blockEdit: "Edit Protection",
-        blockScreenCapture: "Screen Capture Protection",
-        lockOnFailure: "Lock On Failure",
-        sendAccessAck: "Access Acknowledgement"
-    };
-
-    showNotification(`${controlLabels[controlName]} ${irmSettings[controlName] ? "enabled" : "disabled"}`);
+        irmSettings[controlName] = !irmSettings[controlName];
+        updateIRMUI();
+        updateIRMSettings();
+        
+        const controlLabels = {
+            blockCopy: "Copy Protection",
+            blockPrint: "Print Protection",
+            blockSaveAs: "SaveAs Protection",
+            blockEdit: "Edit Protection",
+            blockScreenCapture: "Screen Capture Protection",
+            lockOnFailure: "Lock On Failure",
+            sendAccessAck: "Access Acknowledgement"
+        };
+        
+        showNotification(`${controlLabels[controlName]} ${irmSettings[controlName] ? "enabled" : "disabled"}`);
+    } catch (error) {
+        console.error(`Error in toggleIRMControl (${controlName}):`, error);
+        showNotification("We couldn't complete your request. Please try again later.", "error");
+    } finally {
+        hideLoader();
+    }
 }
-
+function isNetworkError(error) {
+    return error.message.includes("Network Error") || 
+           error.message.includes("Failed to fetch") ||
+           error.errorCode === "network_error";
+}
 // Update IRM UI based on current settings
 function updateIRMUI() {
     document.getElementById("blockCopyCheckbox").checked = irmSettings.blockCopy;
@@ -230,18 +263,36 @@ async function getAccessToken() {
 
         const silentRequest = {
             scopes: ["User.Read", "Mail.Send"],
-            account: accounts[0]
+            account: accounts[0],
+            forceRefresh: false // Only force refresh when needed
         };
 
         try {
             const response = await msalInstance.acquireTokenSilent(silentRequest);
             return response.accessToken;
         } catch (silentError) {
-            console.log("Silent token failed, trying popup:", silentError);
-            return await loginAndGetToken();
+            console.log("Silent token acquisition failed, trying popup:", silentError);
+            
+            // Add specific error handling
+            if (silentError instanceof msal.InteractionRequiredAuthError) {
+                return await loginAndGetToken();
+            }
+            
+            throw silentError;
         }
     } catch (error) {
         console.error("Error in getAccessToken:", error);
+        
+        // Show user-friendly error message
+        if (error.errorCode === "network_error") {
+            showNotification("Network error. Please check your connection and try again.", "error");
+        } else if (error.errorCode === "login_required") {
+            showNotification("Session expired. Please sign in again.", "warning");
+            await signOut();
+        } else {
+            showNotification("Authentication failed. Please try again.", "error");
+        }
+        
         throw error;
     }
 }
@@ -447,6 +498,14 @@ async function onMessageSendHandler(eventArgs) {
 
     try {
         // 1. Initialize MSAL if not already done
+         if (!navigator.onLine) {
+            await showOutlookNotification(
+                "Network Error", 
+                "You appear to be offline. Please check your network connection."
+            );
+            eventArgs.completed({ allowEvent: false });
+            return;
+        }
         if (!isInitialized) {
             initializeMSAL();
         }
@@ -517,11 +576,17 @@ async function onMessageSendHandler(eventArgs) {
         eventArgs.completed({ allowEvent: true });
 
     } catch (error) {
-        console.error('❌ Unhandled error in onMessageSendHandler:', error);
-        await showOutlookNotification(
-            "Error",
-            "An unexpected error occurred while sending the email. Please try again."
-        );
+        if (isNetworkError(error)) {
+            await showOutlookNotification(
+                "Network Error",
+                "We couldn't access KntrolEMAIL services. Please check your network connection."
+            );
+        } else {
+            await showOutlookNotification(
+                "Error",
+                "We're sorry, an unexpected error occurred. Please try again later."
+            );
+        }
         eventArgs.completed({ allowEvent: false });
     } finally {
         console.log(`⏱️ Handler completed in ${Date.now() - startTime}ms`);
@@ -854,11 +919,38 @@ function generateUUID() {
 // Outlook notification helper
 async function showOutlookNotification(title, message) {
     return new Promise((resolve) => {
+        // Format the message better
+        const formattedMessage = `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                <h3 style="color: #0078d4; margin-bottom: 8px;">${title}</h3>
+                <p style="margin-top: 0;">${message}</p>
+                ${title.includes("Error") ? '<p style="font-size: smaller;">Please try again or contact support if the problem persists.</p>' : ''}
+            </div>
+        `;
+        
         Office.context.mailbox.item.notificationMessages.addAsync("notification", {
-            type: "informationalMessage",
-            message: `${title}: ${message}`,
+            type: title.includes("Error") ? "errorMessage" : "informationalMessage",
+            message: formattedMessage,
             icon: "icon1",
             persistent: false
         }, resolve);
     });
+}
+async function refreshTokenIfNeeded() {
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length === 0) return false;
+    
+    const silentRequest = {
+        scopes: ["User.Read", "Mail.Send"],
+        account: accounts[0],
+        forceRefresh: true
+    };
+    
+    try {
+        const response = await msalInstance.acquireTokenSilent(silentRequest);
+        return true;
+    } catch (error) {
+        console.error("Token refresh failed:", error);
+        return false;
+    }
 }
