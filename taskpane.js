@@ -482,12 +482,12 @@ function applyPolicyToUI(policy) {
     updateIRMUI();
 
     // Update policy status display
-    const policyStatus = document.getElementById("policyStatus");
-    policyStatus.innerHTML = `
-        <strong>Active Policy:</strong> ${policy.policyName}<br>
-        <strong>IRM Enabled:</strong> ${policy.enableIRM ? "Yes" : "No"}<br>
-        <strong>Last Updated:</strong> ${new Date().toLocaleString()}
-    `;
+    // const policyStatus = document.getElementById("policyStatus");
+    // policyStatus.innerHTML = `
+    //     <strong>Active Policy:</strong> ${policy.policyName}<br>
+    //     <strong>IRM Enabled:</strong> ${policy.enableIRM ? "Yes" : "No"}<br>
+    //     <strong>Last Updated:</strong> ${new Date().toLocaleString()}
+    // `;
 }
 
 // Main email send handler
