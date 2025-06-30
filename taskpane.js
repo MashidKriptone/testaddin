@@ -88,7 +88,7 @@ function handleAuthResponse(response) {
 // Initialize UI elements
 function initializeUI() {
     document.getElementById("signInButton").addEventListener("click", signIn);
-    document.getElementById("signOutButton").addEventListener("click", signOut);
+    // document.getElementById("signOutButton").addEventListener("click", signOut);
 
     // IRM Control Event Listeners
     document.getElementById("blockCopyCheckbox").addEventListener("change", () => toggleIRMControl('blockCopy'));
@@ -193,7 +193,7 @@ function updateUI() {
     const isSignedIn = accounts.length > 0;
 
     document.getElementById("signInButton").style.display = isSignedIn ? "none" : "block";
-    document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
+    // document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
     document.getElementById("mainContent").style.display = isSignedIn ? "block" : "none";
 
     if (isSignedIn) {
@@ -227,26 +227,26 @@ async function signIn() {
 }
 
 // Sign out function
-async function signOut() {
-    try {
-        showLoader("Signing out...");
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            const logoutRequest = {
-                account: accounts[0],
-                postLogoutRedirectUri: window.location.origin
-            };
-            await msalInstance.logoutPopup(logoutRequest);
-        }
-        console.log("Logout successful");
-        updateUI();
-        hideLoader();
-    } catch (error) {
-        console.error("Logout error:", error);
-        updateStatus("Logout failed. Please try again.", "error");
-        hideLoader();
-    }
-}
+// async function signOut() {
+//     try {
+//         showLoader("Signing out...");
+//         const accounts = msalInstance.getAllAccounts();
+//         if (accounts.length > 0) {
+//             const logoutRequest = {
+//                 account: accounts[0],
+//                 postLogoutRedirectUri: window.location.origin
+//             };
+//             await msalInstance.logoutPopup(logoutRequest);
+//         }
+//         console.log("Logout successful");
+//         updateUI();
+//         hideLoader();
+//     } catch (error) {
+//         console.error("Logout error:", error);
+//         updateStatus("Logout failed. Please try again.", "error");
+//         hideLoader();
+//     }
+// }
 
 // Get access token
 async function getAccessToken() {
