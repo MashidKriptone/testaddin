@@ -10,20 +10,21 @@ Office.onReady((info) => {
         console.log('KntrolEMAIL add-in initialized');
     }
 });
-function onNewMessageCompose(event) {
-  // Auto-open the taskpane
-  Office.context.ui.displayDialogAsync(
-    'https://mashidkriptone.github.io/testaddin/taskpane.html',
-    { height: 50, width: 50 },
-    function (result) {
-      // Dialog opened successfully
-      event.completed();
-    }
-  );
-}
+Office.actions.associate("onComposeLaunchHandler", async function (event) {
+  try {
+    // Optionally show some default IRM info or settings
+    console.log("Compose launched - showing IRM policy");
 
-// Make sure to declare this function as available to Office.js
-Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+    // You can manipulate the UI or preload data here if needed
+
+    // Mark event as complete
+    event.completed();
+  } catch (err) {
+    console.error("Error launching taskpane:", err);
+    event.completed();
+  }
+});
+
 // MSAL Configuration
 const msalConfig = {
     auth: {
