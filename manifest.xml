@@ -196,18 +196,20 @@
               </OfficeTab>
             </ExtensionPoint>
 
+<ExtensionPoint xsi:type="LaunchEvent">
+  <LaunchEvents>
+    <LaunchEvent Type="OnMessageCompose" FunctionName="onComposeLaunchHandler" />
+  </LaunchEvents>
+  <SourceLocation resid="WebViewRuntime.Url"/>
+</ExtensionPoint>
+
             <ExtensionPoint xsi:type="LaunchEvent">
               <LaunchEvents>
                 <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
               </LaunchEvents>
               <SourceLocation resid="WebViewRuntime.Url"/>
             </ExtensionPoint>
-            <ExtensionPoint xsi:type="LaunchEvent">
-  <LaunchEvents>
-    <LaunchEvent Type="OnMessageCompose" FunctionName="onComposeLaunchHandler" />
-  </LaunchEvents>
-  <SourceLocation resid="WebViewRuntime.Url"/>
-</ExtensionPoint>
+       
 
           </DesktopFormFactor>
         </Host>

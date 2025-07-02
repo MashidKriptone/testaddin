@@ -11,18 +11,9 @@ Office.onReady((info) => {
     }
 });
 Office.actions.associate("onComposeLaunchHandler", async function (event) {
-  try {
-    // Optionally show some default IRM info or settings
-    console.log("Compose launched - showing IRM policy");
-
-    // You can manipulate the UI or preload data here if needed
-
-    // Mark event as complete
-    event.completed();
-  } catch (err) {
-    console.error("Error launching taskpane:", err);
-    event.completed();
-  }
+  // This will load taskpane.html automatically
+  console.log("Auto-launching IRM taskpane on Compose.");
+  event.completed();
 });
 
 // MSAL Configuration
