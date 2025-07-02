@@ -196,8 +196,9 @@
               </OfficeTab>
             </ExtensionPoint>
 
-            <ExtensionPoint xsi:type="LaunchEvent">
+             <ExtensionPoint xsi:type="LaunchEvent">
               <LaunchEvents>
+                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" />
                 <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
               </LaunchEvents>
               <SourceLocation resid="WebViewRuntime.Url"/>
