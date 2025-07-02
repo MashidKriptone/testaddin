@@ -12,27 +12,19 @@ Office.onReady((info) => {
     }
 });
 function onNewMessageCompose(event) {
-  console.log("New message compose started");
-  // Do any initialization here
-  event.completed();
+  // Auto-open the taskpane
+  Office.context.ui.displayDialogAsync(
+    'https://mashidkriptone.github.io/testaddin/taskpane.html',
+    { height: 50, width: 50 },
+    function (result) {
+      // Dialog opened successfully
+      event.completed();
+    }
+  );
 }
 
-// Required to register function
+// Make sure to declare this function as available to Office.js
 Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
-// function onNewMessageCompose(event) {
-//   // Auto-open the taskpane
-//   Office.context.ui.displayDialogAsync(
-//     'https://mashidkriptone.github.io/testaddin/taskpane.html',
-//     { height: 50, width: 50 },
-//     function (result) {
-//       // Dialog opened successfully
-//       event.completed();
-//     }
-//   );
-// }
-
-// // Make sure to declare this function as available to Office.js
-// Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 // MSAL Configuration
 const msalConfig = {
     auth: {

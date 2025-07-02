@@ -79,7 +79,6 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url" />
-                      <TaskpaneDockLocation dock="right" />
                     </Action>
                   </Control>
                 </Group>
@@ -198,14 +197,8 @@
             </ExtensionPoint>
 
             <ExtensionPoint xsi:type="LaunchEvent">
-             <ExtensionPoint xsi:type="LaunchEvent">
               <LaunchEvents>
-                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose"/>
-              </LaunchEvents>
-              <SourceLocation resid="Commands.Url"/>
-            </ExtensionPoint>
-              <LaunchEvents>
-              <!-- <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" /> -->
+              <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" />
                 <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
               </LaunchEvents>
               <SourceLocation resid="WebViewRuntime.Url"/>
