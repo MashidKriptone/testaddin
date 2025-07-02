@@ -2,6 +2,7 @@
 
 // Initialize when Office is ready
 Office.onReady((info) => {
+    console.log("Office ready");
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
         initializeUI();
@@ -10,16 +11,28 @@ Office.onReady((info) => {
         console.log('KntrolEMAIL add-in initialized');
     }
 });
-Office.actions.associate("onComposeLaunchHandler", async function (event) {
-  try {
-    await Office.addin.showAsTaskpane(); // THIS opens taskpane programmatically
-    console.log("Taskpane opened automatically in Compose.");
-  } catch (e) {
-    console.error("Failed to show taskpane:", e);
-  }
+function onNewMessageCompose(event) {
+  console.log("New message compose started");
+  // Do any initialization here
   event.completed();
-});
+}
 
+// Required to register function
+Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+// function onNewMessageCompose(event) {
+//   // Auto-open the taskpane
+//   Office.context.ui.displayDialogAsync(
+//     'https://mashidkriptone.github.io/testaddin/taskpane.html',
+//     { height: 50, width: 50 },
+//     function (result) {
+//       // Dialog opened successfully
+//       event.completed();
+//     }
+//   );
+// }
+
+// // Make sure to declare this function as available to Office.js
+// Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 // MSAL Configuration
 const msalConfig = {
     auth: {
