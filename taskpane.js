@@ -11,8 +11,12 @@ Office.onReady((info) => {
     }
 });
 Office.actions.associate("onComposeLaunchHandler", async function (event) {
-  // This will load taskpane.html automatically
-  console.log("Auto-launching IRM taskpane on Compose.");
+  try {
+    await Office.addin.showAsTaskpane(); // THIS opens taskpane programmatically
+    console.log("Taskpane opened automatically in Compose.");
+  } catch (e) {
+    console.error("Failed to show taskpane:", e);
+  }
   event.completed();
 });
 
