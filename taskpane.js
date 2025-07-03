@@ -3,7 +3,6 @@
 // Initialize when Office is ready
 Office.onReady((info) => {
     console.log("Office ready");
-    Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
         initializeUI();
@@ -16,6 +15,7 @@ function onNewMessageCompose(event) {
   console.log("Compose triggered"); // Optional logging
   event.completed(); // Required to let Outlook continue
 }
+  Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 // function onNewMessageCompose(event) {
 //   // Auto-open the taskpane
 //   Office.context.ui.displayDialogAsync(
