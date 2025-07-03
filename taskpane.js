@@ -3,33 +3,44 @@
 // Initialize when Office is ready
 Office.onReady((info) => {
     console.log("Office ready");
+
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
         initializeUI();
         registerIRMFunctions();
+
+        // Associate handlers after Office is ready
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+        Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+
         console.log('KntrolEMAIL add-in initialized');
     }
 });
-function onNewMessageCompose(event) {
-  console.log("Compose triggered"); // Optional logging
-  event.completed(); // Required to let Outlook continue
-}
-  Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
-// function onNewMessageCompose(event) {
-//   // Auto-open the taskpane
-//   Office.context.ui.displayDialogAsync(
-//     'https://mashidkriptone.github.io/testaddin/taskpane.html',
-//     { height: 50, width: 50 },
-//     function (result) {
-//       // Dialog opened successfully
-//       event.completed();
-//     }
-//   );
-// }
 
-// // Make sure to declare this function as available to Office.js
-// Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+function onNewMessageCompose(event) {
+    console.log("onNewMessageCompose triggered");
+
+    Office.context.mailbox.item.notificationMessages.addAsync("loadingMessage", {
+        type: "informationalMessage",
+        message: "Opening Kntrol Taskpane...",
+        icon: "icon16",
+        persistent: false
+    });
+
+    Office.context.ui.displayTaskPaneAsync(
+        "https://mashidkriptone.github.io/testaddin/taskpane.html",
+        { title: "KntrolEMAIL Taskpane" },
+        function (asyncResult) {
+            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+                console.log("Taskpane opened automatically.");
+            } else {
+                console.error("Failed to open taskpane:", asyncResult.error.message);
+            }
+            event.completed(); // CRITICAL: complete the launch event
+        }
+    );
+}
+
 // MSAL Configuration
 const msalConfig = {
     auth: {
