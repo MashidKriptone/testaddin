@@ -3,6 +3,7 @@
 // Initialize when Office is ready
 Office.onReady((info) => {
     console.log("Office ready");
+    Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
     if (info.host === Office.HostType.Outlook) {
         initializeMSAL();
         initializeUI();
@@ -12,19 +13,23 @@ Office.onReady((info) => {
     }
 });
 function onNewMessageCompose(event) {
-  // Auto-open the taskpane
-  Office.context.ui.displayDialogAsync(
-    'https://mashidkriptone.github.io/testaddin/taskpane.html',
-    { height: 50, width: 50 },
-    function (result) {
-      // Dialog opened successfully
-      event.completed();
-    }
-  );
+  console.log("Compose triggered"); // Optional logging
+  event.completed(); // Required to let Outlook continue
 }
+// function onNewMessageCompose(event) {
+//   // Auto-open the taskpane
+//   Office.context.ui.displayDialogAsync(
+//     'https://mashidkriptone.github.io/testaddin/taskpane.html',
+//     { height: 50, width: 50 },
+//     function (result) {
+//       // Dialog opened successfully
+//       event.completed();
+//     }
+//   );
+// }
 
-// Make sure to declare this function as available to Office.js
-Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+// // Make sure to declare this function as available to Office.js
+// Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 // MSAL Configuration
 const msalConfig = {
     auth: {

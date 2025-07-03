@@ -26,10 +26,10 @@
   </Requirements>
 
   <FormSettings>
-    <Form xsi:type="ItemRead">
+    <Form xsi:type="ItemEdit">
       <DesktopSettings>
         <SourceLocation DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
-        <RequestedHeight>250</RequestedHeight>
+        <!-- <RequestedHeight>250</RequestedHeight> -->
       </DesktopSettings>
     </Form>
   </FormSettings>
@@ -38,6 +38,7 @@
 
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
 
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
@@ -243,7 +244,7 @@
         </bt:Images>
 
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
+          <bt:Url id="Commands.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.js" />
           <bt:Url id="Taskpane.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
           <bt:Url id="WebViewRuntime.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
           <bt:Url id="JSRuntime.Url" DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.js" />
