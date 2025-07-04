@@ -2,7 +2,7 @@
 
 Office.onReady((info) => {
     console.log("Office ready");
-    
+
     if (info.host === Office.HostType.Outlook) {
         // Initialize components
         initializeMSAL();
@@ -13,29 +13,44 @@ Office.onReady((info) => {
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 
-        // Check if we're in compose mode and should auto-open
-        if (Office.context.mailbox.item.displayForm === "edit") {
-            console.log("Already in compose mode - auto-opening taskpane");
-            initializeTaskpane(); // Use the function below
-        }
+       if (Office.context.mailbox.item.displayForm === "edit") {
+    // Method 1: Try official API first
+    if (typeof Office.addin.showAsTaskpane === 'function') {
+      Office.addin.showAsTaskpane()
+        .then(() => console.log("Taskpane opened via showAsTaskpane"))
+        .catch(error => {
+          console.error("showAsTaskpane failed, falling back:", error);
+          clickRibbonButtonProgrammatically();
+        });
+    } 
+    // Method 2: Fallback to ribbon button click
+    else {
+      clickRibbonButtonProgrammatically();
+    }
+  }
     }
 });
 
-async function initializeTaskpane() {
-    try {
-        if (typeof Office.addin.showAsTaskpane === 'function') {
-            await Office.addin.showAsTaskpane();
-        } else {
-            await openAsFallbackTaskpane();
-        }
-    } catch (error) {
-        console.error("Auto-open failed:", error);
-    }
+
+function clickRibbonButtonProgrammatically() {
+  // This simulates clicking the ribbon button
+  Office.ribbon.requestUpdate({
+    tabs: [{
+      id: "TabDefault",
+      groups: [{
+        id: "msgComposeGroup",
+        controls: [{
+          id: "msgComposeOpenPaneButton",
+          enabled: true
+        }]
+      }]
+    }]
+  });
 }
 
 async function onNewMessageCompose(event) {
     console.log("New message compose event triggered");
-    
+
     try {
         // 1. Initialize MSAL if not already done
         if (!isInitialized) {
@@ -53,12 +68,12 @@ async function onNewMessageCompose(event) {
             console.log("Taskpane shown successfully");
         } else {
             console.log("showAsTaskpane not available - using fallback");
-            await openAsFallbackTaskpane();
+            await clickRibbonButtonProgrammatically();
         }
 
         // 4. Complete the event
         event.completed();
-        
+
     } catch (error) {
         console.error("Error in onNewMessageCompose:", error);
         event.completed({ allowEvent: false });
@@ -189,7 +204,7 @@ function registerIRMFunctions() {
 async function toggleIRMControl(controlName) {
     try {
         showLoader(`KntrolEMAIL is working on your ${controlName.replace('block', 'Block ')} request...`);
-        
+
         // First verify we have a valid token
         try {
             await getAccessToken();
@@ -203,7 +218,7 @@ async function toggleIRMControl(controlName) {
         irmSettings[controlName] = !irmSettings[controlName];
         updateIRMUI();
         updateIRMSettings();
-        
+
         const controlLabels = {
             blockCopy: "Copy Protection",
             blockPrint: "Print Protection",
@@ -213,7 +228,7 @@ async function toggleIRMControl(controlName) {
             lockOnFailure: "Lock On Failure",
             sendAccessAck: "Access Acknowledgement"
         };
-        
+
         showNotification(`${controlLabels[controlName]} ${irmSettings[controlName] ? "enabled" : "disabled"}`);
     } catch (error) {
         console.error(`Error in toggleIRMControl (${controlName}):`, error);
@@ -223,9 +238,9 @@ async function toggleIRMControl(controlName) {
     }
 }
 function isNetworkError(error) {
-    return error.message.includes("Network Error") || 
-           error.message.includes("Failed to fetch") ||
-           error.errorCode === "network_error";
+    return error.message.includes("Network Error") ||
+        error.message.includes("Failed to fetch") ||
+        error.errorCode === "network_error";
 }
 // Update IRM UI based on current settings
 function updateIRMUI() {
@@ -340,17 +355,17 @@ async function getAccessToken() {
             return response.accessToken;
         } catch (silentError) {
             console.log("Silent token acquisition failed, trying popup:", silentError);
-            
+
             // Add specific error handling
             if (silentError instanceof msal.InteractionRequiredAuthError) {
                 return await loginAndGetToken();
             }
-            
+
             throw silentError;
         }
     } catch (error) {
         console.error("Error in getAccessToken:", error);
-        
+
         // Show user-friendly error message
         if (error.errorCode === "network_error") {
             showNotification("Network error. Please check your connection and try again.", "error");
@@ -360,7 +375,7 @@ async function getAccessToken() {
         } else {
             showNotification("Authentication failed. Please try again.", "error");
         }
-        
+
         throw error;
     }
 }
@@ -566,9 +581,9 @@ async function onMessageSendHandler(eventArgs) {
 
     try {
         // 1. Initialize MSAL if not already done
-         if (!navigator.onLine) {
+        if (!navigator.onLine) {
             await showOutlookNotification(
-                "Network Error", 
+                "Network Error",
                 "You appear to be offline. Please check your network connection."
             );
             eventArgs.completed({ allowEvent: false });
@@ -995,7 +1010,7 @@ async function showOutlookNotification(title, message) {
                 ${title.includes("Error") ? '<p style="font-size: smaller;">Please try again or contact support if the problem persists.</p>' : ''}
             </div>
         `;
-        
+
         Office.context.mailbox.item.notificationMessages.addAsync("notification", {
             type: title.includes("Error") ? "errorMessage" : "informationalMessage",
             message: formattedMessage,
@@ -1007,13 +1022,13 @@ async function showOutlookNotification(title, message) {
 async function refreshTokenIfNeeded() {
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length === 0) return false;
-    
+
     const silentRequest = {
         scopes: ["User.Read", "Mail.Send"],
         account: accounts[0],
         forceRefresh: true
     };
-    
+
     try {
         const response = await msalInstance.acquireTokenSilent(silentRequest);
         return true;
