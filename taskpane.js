@@ -13,85 +13,24 @@ Office.onReady((info) => {
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 
-       if (Office.context.mailbox.item.displayForm === "edit") {
-    // Method 1: Try official API first
-    if (typeof Office.addin.showAsTaskpane === 'function') {
-      Office.addin.showAsTaskpane()
-        .then(() => console.log("Taskpane opened via showAsTaskpane"))
-        .catch(error => {
-          console.error("showAsTaskpane failed, falling back:", error);
-          clickRibbonButtonProgrammatically();
-        });
-    } 
-    // Method 2: Fallback to ribbon button click
-    else {
-      clickRibbonButtonProgrammatically();
-    }
-  }
     }
 });
 
 
-function clickRibbonButtonProgrammatically() {
-  // This simulates clicking the ribbon button
-  Office.ribbon.requestUpdate({
-    tabs: [{
-      id: "TabDefault",
-      groups: [{
-        id: "msgComposeGroup",
-        controls: [{
-          id: "msgComposeOpenPaneButton",
-          enabled: true
-        }]
-      }]
-    }]
-  });
-}
-
-async function onNewMessageCompose(event) {
+function onNewMessageCompose(event) {
     console.log("New message compose event triggered");
 
-    try {
-        // 1. Initialize MSAL if not already done
-        if (!isInitialized) {
-            initializeMSAL();
-        }
-
-        // 2. Check authentication status
-        const accounts = msalInstance?.getAllAccounts() || [];
-        const isAuthenticated = accounts.length > 0;
-
-        // 3. Open taskpane immediately (auth will happen when needed)
-        if (typeof Office.addin.showAsTaskpane === 'function') {
-            console.log("Attempting to show as taskpane");
-            await Office.addin.showAsTaskpane();
-            console.log("Taskpane shown successfully");
-        } else {
-            console.log("showAsTaskpane not available - using fallback");
-            await clickRibbonButtonProgrammatically();
-        }
-
-        // 4. Complete the event
-        event.completed();
-
-    } catch (error) {
-        console.error("Error in onNewMessageCompose:", error);
-        event.completed({ allowEvent: false });
-    }
-}
-
-async function openAsFallbackTaskpane() {
-    return new Promise((resolve) => {
-        Office.context.ui.displayDialogAsync(
-    "https://mashidkriptone.github.io/testaddin/taskpane.html",
-            { height: 60, width: 30 },
-            (result) => {
-                if (result.status === Office.AsyncResultStatus.Failed) {
-                    console.error("Dialog failed:", result.error.message);
-                }
-                resolve();
-            }
-        );
+    Office.ribbon.requestUpdate({
+        tabs: [{
+            id: "TabDefault",
+            groups: [{
+                id: "msgComposeGroup",
+                controls: [{
+                    id: "msgComposeOpenPaneButton",
+                    enabled: true
+                }]
+            }]
+        }]
     });
 }
 // MSAL Configuration
