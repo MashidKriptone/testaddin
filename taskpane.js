@@ -1,45 +1,83 @@
 /* global Office, msal */
 
-// Initialize when Office is ready
 Office.onReady((info) => {
     console.log("Office ready");
-
+    
     if (info.host === Office.HostType.Outlook) {
+        // Initialize components
         initializeMSAL();
         initializeUI();
         registerIRMFunctions();
 
-        // Associate handlers after Office is ready
+        // Associate handlers
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 
-        console.log('KntrolEMAIL add-in initialized');
+        // Check if we're in compose mode and should auto-open
+        if (Office.context.mailbox.item.displayForm === "edit") {
+            console.log("Already in compose mode - auto-opening taskpane");
+            initializeTaskpane(); // Use the function below
+        }
     }
 });
 
-function onNewMessageCompose(event) {
-  // Open as taskpane in Outlook Web
-  if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
-    Office.addin.showAsTaskpane()
-      .then(() => event.completed())
-      .catch(() => fallbackOpenTaskpane(event));
-  } else {
-    fallbackOpenTaskpane(event);
-  }
+async function initializeTaskpane() {
+    try {
+        if (typeof Office.addin.showAsTaskpane === 'function') {
+            await Office.addin.showAsTaskpane();
+        } else {
+            await openAsFallbackTaskpane();
+        }
+    } catch (error) {
+        console.error("Auto-open failed:", error);
+    }
 }
 
-function fallbackOpenTaskpane(event) {
-  // Fallback for desktop Outlook
-  Office.context.ui.displayDialogAsync(
-    "https://mashidkriptone.github.io/testaddin/taskpane.html",
-    { height: 60, width: 30 },
-    (result) => {
-      if (result.status === Office.AsyncResultStatus.Failed) {
-        console.error(result.error.message);
-      }
-      event.completed();
+async function onNewMessageCompose(event) {
+    console.log("New message compose event triggered");
+    
+    try {
+        // 1. Initialize MSAL if not already done
+        if (!isInitialized) {
+            initializeMSAL();
+        }
+
+        // 2. Check authentication status
+        const accounts = msalInstance?.getAllAccounts() || [];
+        const isAuthenticated = accounts.length > 0;
+
+        // 3. Open taskpane immediately (auth will happen when needed)
+        if (typeof Office.addin.showAsTaskpane === 'function') {
+            console.log("Attempting to show as taskpane");
+            await Office.addin.showAsTaskpane();
+            console.log("Taskpane shown successfully");
+        } else {
+            console.log("showAsTaskpane not available - using fallback");
+            await openAsFallbackTaskpane();
+        }
+
+        // 4. Complete the event
+        event.completed();
+        
+    } catch (error) {
+        console.error("Error in onNewMessageCompose:", error);
+        event.completed({ allowEvent: false });
     }
-  );
+}
+
+async function openAsFallbackTaskpane() {
+    return new Promise((resolve) => {
+        Office.context.ui.displayDialogAsync(
+    "https://mashidkriptone.github.io/testaddin/taskpane.html",
+            { height: 60, width: 30 },
+            (result) => {
+                if (result.status === Office.AsyncResultStatus.Failed) {
+                    console.error("Dialog failed:", result.error.message);
+                }
+                resolve();
+            }
+        );
+    });
 }
 // MSAL Configuration
 const msalConfig = {
