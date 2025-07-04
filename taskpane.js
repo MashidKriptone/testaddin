@@ -41,6 +41,29 @@ function fallbackOpenTaskpane(event) {
     }
   );
 }
+// MSAL Configuration
+const msalConfig = {
+    auth: {
+        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
+        authority: "https://login.microsoftonline.com/common",
+        redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html", // Use dynamic origin
+    },
+    cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: true,
+        secureCookies: true
+    },
+    system: {
+        loggerOptions: {
+            loggerCallback: (level, message, containsPii) => {
+                if (containsPii) return;
+                console.log(`MSAL ${level}: ${message}`);
+            },
+            logLevel: msal.LogLevel.Verbose
+        }
+    }
+};
+
 
 // MSAL instance and state
 let msalInstance;
