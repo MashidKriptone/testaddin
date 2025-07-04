@@ -62,7 +62,13 @@
 
           <DesktopFormFactor>
             <FunctionFile resid="Commands.Url" />
-
+<ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+              <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" />
+                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
+              </LaunchEvents>
+              <SourceLocation resid="WebViewRuntime.Url"/>
+            </ExtensionPoint>
             <ExtensionPoint xsi:type="MessageComposeCommandSurface">
               <OfficeTab id="TabDefault">
                 <Group id="msgComposeGroup">
@@ -195,14 +201,6 @@
                   </Control>
                 </Group>
               </OfficeTab>
-            </ExtensionPoint>
-
-            <ExtensionPoint xsi:type="LaunchEvent">
-              <LaunchEvents>
-              <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" />
-                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
-              </LaunchEvents>
-              <SourceLocation resid="WebViewRuntime.Url"/>
             </ExtensionPoint>
           </DesktopFormFactor>
         </Host>

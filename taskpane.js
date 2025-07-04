@@ -18,51 +18,29 @@ Office.onReady((info) => {
 });
 
 function onNewMessageCompose(event) {
-    console.log("onNewMessageCompose triggered");
-
-    Office.context.mailbox.item.notificationMessages.addAsync("loadingMessage", {
-        type: "informationalMessage",
-        message: "Opening Kntrol Taskpane...",
-        icon: "icon16",
-        persistent: false
-    });
-
-    Office.context.ui.displayTaskPaneAsync(
-        "https://mashidkriptone.github.io/testaddin/taskpane.html",
-        { title: "KntrolEMAIL Taskpane" },
-        function (asyncResult) {
-            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-                console.log("Taskpane opened automatically.");
-            } else {
-                console.error("Failed to open taskpane:", asyncResult.error.message);
-            }
-            event.completed(); // CRITICAL: complete the launch event
-        }
-    );
+  // Open as taskpane in Outlook Web
+  if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
+    Office.addin.showAsTaskpane()
+      .then(() => event.completed())
+      .catch(() => fallbackOpenTaskpane(event));
+  } else {
+    fallbackOpenTaskpane(event);
+  }
 }
 
-// MSAL Configuration
-const msalConfig = {
-    auth: {
-        clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
-        authority: "https://login.microsoftonline.com/common",
-        redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html", // Use dynamic origin
-    },
-    cache: {
-        cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: true,
-        secureCookies: true
-    },
-    system: {
-        loggerOptions: {
-            loggerCallback: (level, message, containsPii) => {
-                if (containsPii) return;
-                console.log(`MSAL ${level}: ${message}`);
-            },
-            logLevel: msal.LogLevel.Verbose
-        }
+function fallbackOpenTaskpane(event) {
+  // Fallback for desktop Outlook
+  Office.context.ui.displayDialogAsync(
+    "https://mashidkriptone.github.io/testaddin/taskpane.html",
+    { height: 60, width: 30 },
+    (result) => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        console.error(result.error.message);
+      }
+      event.completed();
     }
-};
+  );
+}
 
 // MSAL instance and state
 let msalInstance;
