@@ -6,8 +6,6 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         // First associate handlers
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-        Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
-
         // Then initialize other components
         initializeMSAL();
         initializeUI();
@@ -15,17 +13,6 @@ Office.onReady((info) => {
     }
 });
 
-
-function onNewMessageCompose(event) {
-    try {
-        console.log("New message compose event triggered");
-        Office.context.ui.displayTaskPane();
-    } catch (error) {
-        console.error("Error opening task pane:", error);
-    } finally {
-        event.completed();
-    }
-}
 
 // MSAL Configuration
 const msalConfig = {
