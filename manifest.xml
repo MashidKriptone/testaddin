@@ -67,7 +67,7 @@
               <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageCompose" />
                 <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="Block" />
               </LaunchEvents>
-              <SourceLocation resid="WebViewRuntime.Url"/>
+              <SourceLocation resid="Taskpane.Url"/>
             </ExtensionPoint>
             <ExtensionPoint xsi:type="MessageComposeCommandSurface">
               <OfficeTab id="TabDefault">
@@ -86,8 +86,6 @@
         </Icon>
         <Action xsi:type="ShowTaskpane">
           <SourceLocation resid="Taskpane.Url"/>
-          <!-- Add this for auto-open functionality -->
-          <SupportsPinning>true</SupportsPinning>
         </Action>
       </Control>
     </Group>

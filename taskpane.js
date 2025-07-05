@@ -4,37 +4,29 @@ Office.onReady((info) => {
     console.log("Office ready");
 
     if (info.host === Office.HostType.Outlook) {
-        // Initialize components
-        initializeMSAL();
-        initializeUI();
-        registerIRMFunctions();
-
-        // Associate handlers
+        // First associate handlers
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 
+        // Then initialize other components
+        initializeMSAL();
+        initializeUI();
+        registerIRMFunctions();
     }
 });
 
 
 function onNewMessageCompose(event) {
-    console.log("new message compose ")
-    Office.context.mailbox.addHandlerAsync(
-  Office.EventType.ItemChanged, 
-  function(eventArgs) {
-    if (Office.context.mailbox.item) {
-      // Check if this is a new compose window
-      Office.context.mailbox.item.getComposeTypeAsync(function(result) {
-        if (result.status === Office.AsyncResultStatus.Succeeded && 
-            result.value === Office.MailboxEnums.ItemType.NewMessage) {
-          // Open the task pane
-          Office.context.ui.displayTaskPane();
-        }
-      });
+    try {
+        console.log("New message compose event triggered");
+        Office.context.ui.displayTaskPane();
+    } catch (error) {
+        console.error("Error opening task pane:", error);
+    } finally {
+        event.completed();
     }
-  }
-);
 }
+
 // MSAL Configuration
 const msalConfig = {
     auth: {
