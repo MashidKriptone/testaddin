@@ -11,13 +11,14 @@ Office.onReady((info) => {
 
         // Associate handlers
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-      
+        Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 
     }
 });
 
-Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+
 function onNewMessageCompose(event) {
+    console.log("new message compose ")
     Office.context.mailbox.addHandlerAsync(
   Office.EventType.ItemChanged, 
   function(eventArgs) {
