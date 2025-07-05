@@ -11,27 +11,28 @@ Office.onReady((info) => {
 
         // Associate handlers
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-        Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+      
 
     }
 });
 
-
+Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
 function onNewMessageCompose(event) {
-    console.log("New message compose event triggered");
-
-    Office.ribbon.requestUpdate({
-        tabs: [{
-            id: "TabDefault",
-            groups: [{
-                id: "msgComposeGroup",
-                controls: [{
-                    id: "msgComposeOpenPaneButton",
-                    enabled: true
-                }]
-            }]
-        }]
-    });
+    Office.context.mailbox.addHandlerAsync(
+  Office.EventType.ItemChanged, 
+  function(eventArgs) {
+    if (Office.context.mailbox.item) {
+      // Check if this is a new compose window
+      Office.context.mailbox.item.getComposeTypeAsync(function(result) {
+        if (result.status === Office.AsyncResultStatus.Succeeded && 
+            result.value === Office.MailboxEnums.ItemType.NewMessage) {
+          // Open the task pane
+          Office.context.ui.displayTaskPane();
+        }
+      });
+    }
+  }
+);
 }
 // MSAL Configuration
 const msalConfig = {
