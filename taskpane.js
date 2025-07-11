@@ -16,7 +16,15 @@ Office.onReady((info) => {
 function onNewMessageCompose(event) {
   console.log("🚀 Launch Event: onNewMessageCompose triggered");
 //   Office.addin.showAsTaskpane();
-     Office.context.ui.displayTaskPane();
+    //  Office.context.ui.displayTaskPane();
+      Office.context.ui.displayDialogAsync(
+    'https://mashidkriptone.github.io/testaddin/taskpane.html',
+    { height: 50, width: 50 },
+    function (result) {
+      // Dialog opened successfully
+      event.completed();
+    }
+  );
   event.completed();
 }
 
