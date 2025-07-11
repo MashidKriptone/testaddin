@@ -27,6 +27,7 @@ async function onNewMessageCompose(event) {
 //   );
 try {
     await Office.addin.showAsTaskpane();
+    console.log(Office.addin)
     console.log("Taskpane opened.");
     event.completed();
   } catch (err) {
