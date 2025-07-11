@@ -15,7 +15,8 @@ Office.onReady((info) => {
 });
 function onNewMessageCompose(event) {
   console.log("🚀 Launch Event: onNewMessageCompose triggered");
-  Office.addin.showAsTaskpane();
+//   Office.addin.showAsTaskpane();
+     Office.context.ui.displayTaskPane();
   event.completed();
 }
 
