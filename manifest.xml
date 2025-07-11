@@ -21,14 +21,14 @@
 
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.12" />
+      <Set Name="Mailbox" MinVersion="1.13" />
     </Sets>
   </Requirements>
 
   <FormSettings>
     <Form xsi:type="ItemEdit">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://mashidkriptone.github.io/outlook365/taskpane.html" />
+        <SourceLocation DefaultValue="https://mashidkriptone.github.io/testaddin/taskpane.html" />
         <!-- <RequestedHeight>250</RequestedHeight> -->
       </DesktopSettings>
     </Form>
