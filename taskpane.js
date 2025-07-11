@@ -13,18 +13,26 @@ Office.onReady((info) => {
         registerIRMFunctions();
     }
 });
-function onNewMessageCompose(event) {
+async function onNewMessageCompose(event) {
   console.log("🚀 Launch Event: onNewMessageCompose triggered");
 //   Office.addin.showAsTaskpane();
-    //  Office.context.ui.displayTaskPane();
-      Office.context.ui.displayDialogAsync(
-    'https://mashidkriptone.github.io/testaddin/taskpane.html',
-    { height: 50, width: 50 },
-    function (result) {
-      // Dialog opened successfully
-      event.completed();
-    }
-  );
+    //   Office.context.ui.displayTaskPane();
+    //   Office.context.ui.displayDialogAsync(
+    // 'https://mashidkriptone.github.io/testaddin/taskpane.html',
+    // { height: 50, width: 50 },
+    // function (result) {
+    //   // Dialog opened successfully
+    //   event.completed();
+    // }
+//   );
+try {
+    await Office.addin.showAsTaskpane();
+    console.log("Taskpane opened.");
+    event.completed();
+  } catch (err) {
+    console.error("Error opening taskpane:", err);
+    event.completed();
+  }
   event.completed();
 }
 
