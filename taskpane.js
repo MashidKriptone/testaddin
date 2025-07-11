@@ -5,6 +5,7 @@ Office.onReady((info) => {
 
     if (info.host === Office.HostType.Outlook) {
         // First associate handlers
+        Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
         // Then initialize other components
         initializeMSAL();
@@ -12,7 +13,11 @@ Office.onReady((info) => {
         registerIRMFunctions();
     }
 });
-
+function onNewMessageCompose(event) {
+  console.log("🚀 Launch Event: onNewMessageCompose triggered");
+  Office.addin.showAsTaskpane();
+  event.completed();
+}
 
 // MSAL Configuration
 const msalConfig = {
