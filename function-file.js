@@ -1,17 +1,16 @@
-/* global Office */
-
 Office.onReady(() => {
-    Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+      console.log("🚀 Launch Event: onNewMessageCompose triggered");
+  Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
+  Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
 });
 
-async function onNewMessageCompose(event) {
-    try {
-        console.log("✅ onNewMessageCompose triggered");
+function onNewMessageCompose(event) {
+  console.log("🚀 Launch Event: onNewMessageCompose triggered");
+  Office.addin.showAsTaskpane();
+  event.completed();
+}
 
-        await Office.addin.showAsTaskpane(); // ✅ This is the correct API to open taskpane
-    } catch (error) {
-        console.error("❌ Error opening task pane:", error);
-    } finally {
-        event.completed();
-    }
+function onMessageSendHandler(event) {
+  console.log("📤 Launch Event: onMessageSendHandler triggered");
+  event.completed({ allowEvent: true });
 }
