@@ -37,7 +37,7 @@ async function onNewMessageCompose(event) {
       console.warn("⚠️ Office.addin not available, fallback used");
       Office.context.ui.displayDialogAsync(
         'https://mashidkriptone.github.io/testaddin/taskpane.html',
-        { height: 50, width: 30 },
+        { height: 70, width: 24 },
         (result) => {
           console.log("Fallback dialog opened");
         }
