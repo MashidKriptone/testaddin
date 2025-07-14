@@ -2,6 +2,10 @@
 
 Office.onReady((info) => {
     console.log("Office ready");
+    console.log('Office Host:', Office.context.host);
+console.log('Office Version:', Office.context.diagnostics.hostVersion);
+console.log('Office.addin:', Office.addin);
+
 
     if (info.host === Office.HostType.Outlook) {
         // First associate handlers
