@@ -29,16 +29,25 @@ async function onNewMessageCompose(event) {
     //   event.completed();
     // }
 //   );
-try {
-    await Office.addin.showAsTaskpane();
-    console.log(Office.addin)
-    console.log("Taskpane opened.");
-    event.completed();
+  try {
+    if (Office.addin && Office.addin.showAsTaskpane) {
+      await Office.addin.showAsTaskpane();
+      console.log("✅ Taskpane opened using Office.addin");
+    } else {
+      console.warn("⚠️ Office.addin not available, fallback used");
+      Office.context.ui.displayDialogAsync(
+        'https://mashidkriptone.github.io/testaddin/taskpane.html',
+        { height: 50, width: 15 },
+        (result) => {
+          console.log("Fallback dialog opened");
+        }
+      );
+    }
   } catch (err) {
-    console.error("Error opening taskpane:", err);
+    console.error("❌ Error opening taskpane:", err);
+  } finally {
     event.completed();
   }
-  event.completed();
 }
 
 // MSAL Configuration
