@@ -362,17 +362,21 @@ function updateUI() {
 //     }
 // }
 async function getUserEmailFromOutlook() {
-    return new Promise((resolve, reject) => {
-        Office.context.mailbox.userProfile.getAsync((result) => {
-            if (result.status === Office.AsyncResultStatus.Succeeded) {
-                resolve(result.value.emailAddress);
-            } else {
-                console.error("Failed to get user email from Outlook:", result.error);
-                resolve("default@kriptone.com"); // Fallback email
-            }
-        });
-    });
+    try {
+        const email = Office.context.mailbox.userProfile.emailAddress;
+        if (email) {
+            console.warn("Email found in userProfile",email)
+            return email;
+        } else {
+            
+            return console.warn("Email not found in userProfile");
+        }
+    } catch (err) {
+       
+        return  console.error("Error getting email from userProfile:", err);;
+    }
 }
+
 // Fetch policy settings from server
 async function fetchPolicySettings() {
     try {
