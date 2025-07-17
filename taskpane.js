@@ -365,7 +365,7 @@ async function getUserEmailFromOutlook() {
     try {
         const email = Office.context.mailbox.userProfile.emailAddress;
         if (email) {
-            console.warn("Email found in userProfile",email)
+            console.log("Email found in userProfile",email)
             return email;
         } else {
             
