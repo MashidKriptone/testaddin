@@ -234,7 +234,7 @@ function updateUI() {
 
     // document.getElementById("signInButton").style.display = isSignedIn ? "none" : "block";
     // document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
-    document.getElementById("mainContent").style.display = isSignedIn ? "block" : "none";
+    document.getElementById("mainContent").style.display = "block";
 
     // if (isSignedIn) {
     //     console.log("User is signed in as:", accounts[0].username);
