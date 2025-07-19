@@ -27,7 +27,7 @@ async function onNewMessageCompose(event) {
       console.warn("⚠️ Office.addin not available, fallback used");
       Office.context.ui.displayDialogAsync(
         'https://mashidkriptone.github.io/testaddin/taskpane.html',
-        { height: 74, width: 26 },
+        { height: 74, width: 26 ,  promptBeforeOpen: false },
         (result) => {
           console.log("Fallback dialog opened");
         }
@@ -407,7 +407,7 @@ async function onMessageSendHandler(eventArgs) {
 
         // 7. Save email data (non-encrypted path)
         try {
-            await saveEmailData(emailData, token);
+            await saveEmailData(emailData);
         } catch (error) {
             console.error('❌ Failed to save email data:', error);
             await showOutlookNotification("Warning", "Email will be sent but audit logging failed");
@@ -644,7 +644,7 @@ async function getEncryptedEmail(emailDataDto) {
 }
 
 // Save email data to server
-async function saveEmailData(emailData,) {
+async function saveEmailData(emailData) {
     try {
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
