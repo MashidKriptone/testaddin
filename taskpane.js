@@ -3,8 +3,8 @@
 Office.onReady((info) => {
     console.log("Office ready");
     console.log('Office Host:', Office.context.host);
-console.log('Office Version:', Office.context.diagnostics.hostVersion);
-console.log('Office.addin:', Office.addin);
+    console.log('Office Version:', Office.context.diagnostics.hostVersion);
+    console.log('Office.addin:', Office.addin);
 
 
     if (info.host === Office.HostType.Outlook) {
@@ -17,27 +17,33 @@ console.log('Office.addin:', Office.addin);
     }
 });
 async function onNewMessageCompose(event) {
-  console.log("🚀 Launch Event: onNewMessageCompose triggered");
+    console.log("🚀 Launch Event: onNewMessageCompose triggered");
 
-  try {
-    if (Office.addin && Office.addin.showAsTaskpane) {
-      await Office.addin.showAsTaskpane();
-      console.log("✅ Taskpane opened using Office.addin");
-    } else {
-      console.warn("⚠️ Office.addin not available, fallback used");
-      Office.context.ui.displayDialogAsync(
-        'https://mashidkriptone.github.io/testaddin/taskpane.html',
-        { height: 74, width: 26 ,  promptBeforeOpen: false },
-        (result) => {
-          console.log("Fallback dialog opened");
+    try {
+        if (Office.addin && Office.addin.showAsTaskpane) {
+            await Office.addin.showAsTaskpane();
+            console.log("✅ Taskpane opened using Office.addin");
+        } else {
+            console.warn("⚠️ Office.addin not available, fallback used");
+            Office.context.ui.displayDialogAsync(
+                'https://mashidkriptone.github.io/testaddin/taskpane.html',
+                {
+                    height: 74,
+                    width: 26,
+                    left: 0,
+                    top: 0,
+                    promptBeforeOpen: false
+                },
+                (result) => {
+                    console.log("Fallback dialog opened");
+                }
+            );
         }
-      );
+    } catch (err) {
+        console.error("❌ Error opening taskpane:", err);
+    } finally {
+        event.completed();
     }
-  } catch (err) {
-    console.error("❌ Error opening taskpane:", err);
-  } finally {
-    event.completed();
-  }
 }
 
 
@@ -65,7 +71,7 @@ let currentPolicy = null;
 
 // Initialize UI elements
 function initializeUI() {
-  
+
     // IRM Control Event Listeners
     document.getElementById("blockCopyCheckbox").addEventListener("change", () => toggleIRMControl('blockCopy'));
     document.getElementById("blockPrintCheckbox").addEventListener("change", () => toggleIRMControl('blockPrint'));
@@ -165,9 +171,9 @@ function updateIRMSettings() {
 
 // Update UI based on auth state
 function updateUI() {
-   
+
     document.getElementById("mainContent").style.display = "block";
-        fetchPolicySettings();
+    fetchPolicySettings();
 }
 
 
@@ -175,15 +181,15 @@ async function getUserEmailFromOutlook() {
     try {
         const email = Office.context.mailbox.userProfile.emailAddress;
         if (email) {
-            console.log("Email found in userProfile",email)
+            console.log("Email found in userProfile", email)
             return email;
         } else {
-            
+
             return console.warn("Email not found in userProfile");
         }
     } catch (err) {
-       
-        return  console.error("Error getting email from userProfile:", err);;
+
+        return console.error("Error getting email from userProfile:", err);;
     }
 }
 
@@ -191,7 +197,7 @@ async function getUserEmailFromOutlook() {
 async function fetchPolicySettings() {
     try {
         showLoader("Loading policy settings...");
-       
+
         const email = await getUserEmailFromOutlook();
 
         const response = await fetch(`https://kntrolemail.kriptone.com:6677/api/Policy/GetPolicyByEmailAsync/${email}`, {
@@ -361,7 +367,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-      
+
 
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
