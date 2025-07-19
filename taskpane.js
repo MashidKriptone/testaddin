@@ -11,7 +11,6 @@ console.log('Office.addin:', Office.addin);
         // First associate handlers
         Office.actions.associate("onNewMessageCompose", onNewMessageCompose);
         Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-        // Then initialize other components
         // initializeMSAL();
         initializeUI();
         registerIRMFunctions();
@@ -19,16 +18,7 @@ console.log('Office.addin:', Office.addin);
 });
 async function onNewMessageCompose(event) {
   console.log("🚀 Launch Event: onNewMessageCompose triggered");
-//   Office.addin.showAsTaskpane();
-    //   Office.context.ui.displayTaskPane();
-    //   Office.context.ui.displayDialogAsync(
-    // 'https://mashidkriptone.github.io/testaddin/taskpane.html',
-    // { height: 50, width: 50 },
-    // function (result) {
-    //   // Dialog opened successfully
-    //   event.completed();
-    // }
-//   );
+
   try {
     if (Office.addin && Office.addin.showAsTaskpane) {
       await Office.addin.showAsTaskpane();
@@ -50,34 +40,7 @@ async function onNewMessageCompose(event) {
   }
 }
 
-// // MSAL Configuration
-// const msalConfig = {
-//     auth: {
-//         clientId: "7b7b9a2e-eff4-4af2-9e37-b0df0821b144",
-//         authority: "https://login.microsoftonline.com/common",
-//         redirectUri: "https://mashidkriptone.github.io/testaddin/redirect.html", // Use dynamic origin
-//     },
-//     cache: {
-//         cacheLocation: "sessionStorage",
-//         storeAuthStateInCookie: true,
-//         secureCookies: true
-//     },
-//     system: {
-//         loggerOptions: {
-//             loggerCallback: (level, message, containsPii) => {
-//                 if (containsPii) return;
-//                 console.log(`MSAL ${level}: ${message}`);
-//             },
-//             logLevel: msal.LogLevel.Verbose
-//         }
-//     }
-// };
 
-
-// // MSAL instance and state
-// let msalInstance;
-// let isInitialized = false;
-// let authInProgress = false;
 
 // IRM Settings
 let irmSettings = {
@@ -98,38 +61,11 @@ let irmSettings = {
 // Current policy from server
 let currentPolicy = null;
 
-// Initialize MSAL
-// function initializeMSAL() {
-//     if (isInitialized) return;
 
-//     msalInstance = new msal.PublicClientApplication(msalConfig);
-//     isInitialized = true;
-
-//     // Handle redirect response if any
-//     msalInstance.handleRedirectPromise()
-//         .then(handleAuthResponse)
-//         .catch(error => {
-//             console.error("Redirect handling error:", error);
-//             updateStatus("Authentication error. Please try signing in again.", "error");
-//         });
-// }
-
-// // Handle authentication response
-// function handleAuthResponse(response) {
-//     if (response) {
-//         console.log("Authentication successful:", response);
-//         updateUI();
-//         fetchPolicySettings();
-//         return response;
-//     }
-//     return null;
-// }
 
 // Initialize UI elements
 function initializeUI() {
-    // document.getElementById("signInButton").addEventListener("click", signIn);
-    // // document.getElementById("signOutButton").addEventListener("click", signOut);
-
+  
     // IRM Control Event Listeners
     document.getElementById("blockCopyCheckbox").addEventListener("change", () => toggleIRMControl('blockCopy'));
     document.getElementById("blockPrintCheckbox").addEventListener("change", () => toggleIRMControl('blockPrint'));
@@ -229,138 +165,12 @@ function updateIRMSettings() {
 
 // Update UI based on auth state
 function updateUI() {
-    // const accounts = msalInstance?.getAllAccounts() || [];
-    // const isSignedIn = accounts.length > 0;
-
-    // document.getElementById("signInButton").style.display = isSignedIn ? "none" : "block";
-    // document.getElementById("signOutButton").style.display = isSignedIn ? "block" : "none";
+   
     document.getElementById("mainContent").style.display = "block";
-
-    // if (isSignedIn) {
-    //     console.log("User is signed in as:", accounts[0].username);
-    //     updateStatus(`Signed in as ${accounts[0].username}`, "success");
         fetchPolicySettings();
-    // } else {
-    //     console.log("User is signed out");
-    //     updateStatus("Please sign in to use KntrolEMAIL", "info");
-    // }
 }
 
-// // Sign in function
-// async function signIn() {
-//     try {
-//         showLoader("Signing in...");
-//         const loginRequest = {
-//             scopes: ["User.Read", "Mail.Send"],
-//             prompt: "select_account"
-//         };
 
-//         const loginResponse = await msalInstance.loginPopup(loginRequest);
-//         console.log("Login successful:", loginResponse);
-//         updateUI();
-//         hideLoader();
-//     } catch (error) {
-//         console.error("Login error:", error);
-//         updateStatus("Login failed. Please try again.", "error");
-//         hideLoader();
-//     }
-// }
-
-// Sign out function
-// async function signOut() {
-//     try {
-//         showLoader("Signing out...");
-//         const accounts = msalInstance.getAllAccounts();
-//         if (accounts.length > 0) {
-//             const logoutRequest = {
-//                 account: accounts[0],
-//                 postLogoutRedirectUri: window.location.origin
-//             };
-//             await msalInstance.logoutPopup(logoutRequest);
-//         }
-//         console.log("Logout successful");
-//         updateUI();
-//         hideLoader();
-//     } catch (error) {
-//         console.error("Logout error:", error);
-//         updateStatus("Logout failed. Please try again.", "error");
-//         hideLoader();
-//     }
-// }
-
-// Get access token
-// async function getAccessToken() {
-//     if (!isInitialized) {
-//         initializeMSAL();
-//     }
-
-//     try {
-//         const accounts = msalInstance.getAllAccounts();
-//         if (accounts.length === 0) {
-//             return await loginAndGetToken();
-//         }
-
-//         const silentRequest = {
-//             scopes: ["User.Read", "Mail.Send"],
-//             account: accounts[0],
-//             forceRefresh: false // Only force refresh when needed
-//         };
-
-//         try {
-//             const response = await msalInstance.acquireTokenSilent(silentRequest);
-//             return response.accessToken;
-//         } catch (silentError) {
-//             console.log("Silent token acquisition failed, trying popup:", silentError);
-
-//             // Add specific error handling
-//             if (silentError instanceof msal.InteractionRequiredAuthError) {
-//                 return await loginAndGetToken();
-//             }
-
-//             throw silentError;
-//         }
-//     } catch (error) {
-//         console.error("Error in getAccessToken:", error);
-
-//         // Show user-friendly error message
-//         if (error.errorCode === "network_error") {
-//             showNotification("Network error. Please check your connection and try again.", "error");
-//         } else if (error.errorCode === "login_required") {
-//             showNotification("Session expired. Please sign in again.", "warning");
-//             await signOut();
-//         } else {
-//             showNotification("Authentication failed. Please try again.", "error");
-//         }
-
-//         throw error;
-//     }
-// }
-
-// Perform interactive login
-// async function loginAndGetToken() {
-//     if (authInProgress) {
-//         throw new Error("Authentication already in progress");
-//     }
-
-//     authInProgress = true;
-//     try {
-//         const loginRequest = {
-//             scopes: ["User.Read", "Mail.Send"],
-//             prompt: "select_account"
-//         };
-
-//         const loginResponse = await msalInstance.loginPopup(loginRequest);
-//         const tokenRequest = {
-//             scopes: ["User.Read", "Mail.Send"],
-//             account: loginResponse.account
-//         };
-
-//         const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
-//         return tokenResponse.accessToken;
-//     } finally {
-//         authInProgress = false;
-//     }
-// }
 async function getUserEmailFromOutlook() {
     try {
         const email = Office.context.mailbox.userProfile.emailAddress;
@@ -381,9 +191,7 @@ async function getUserEmailFromOutlook() {
 async function fetchPolicySettings() {
     try {
         showLoader("Loading policy settings...");
-        // const token = await getAccessToken();
-        // const user = await getUserDetails(token);
-        // const email = user.mail || user.userPrincipalName;
+       
         const email = await getUserEmailFromOutlook();
 
         const response = await fetch(`https://kntrolemail.kriptone.com:6677/api/Policy/GetPolicyByEmailAsync/${email}`, {
@@ -536,13 +344,6 @@ function applyPolicyToUI(policy) {
 
     updateIRMUI();
 
-    // Update policy status display
-    // const policyStatus = document.getElementById("policyStatus");
-    // policyStatus.innerHTML = `
-    //     <strong>Active Policy:</strong> ${policy.policyName}<br>
-    //     <strong>IRM Enabled:</strong> ${policy.enableIRM ? "Yes" : "No"}<br>
-    //     <strong>Last Updated:</strong> ${new Date().toLocaleString()}
-    // `;
 }
 
 // Main email send handler
@@ -560,20 +361,7 @@ async function onMessageSendHandler(eventArgs) {
             eventArgs.completed({ allowEvent: false });
             return;
         }
-        // if (!isInitialized) {
-        //     initializeMSAL();
-        // }
-
-        // // 2. Authenticate and get access token
-        // let token;
-        // try {
-        //     token = await getAccessToken();
-        // } catch (authError) {
-        //     console.error('❌ Authentication failed:', authError);
-        //     await showOutlookNotification("Authentication Required", "Please sign in to continue.");
-        //     eventArgs.completed({ allowEvent: false });
-        //     return;
-        // }
+      
 
         // 3. Get the current mail item
         const item = Office.context.mailbox.item;
@@ -881,20 +669,6 @@ async function saveEmailData(emailData,) {
     }
 }
 
-// Get user details from Microsoft Graph
-// async function getUserDetails(accessToken) {
-//     const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-//         headers: {
-//             'Authorization': `Bearer ${accessToken}`
-//         }
-//     });
-
-//     if (!response.ok) {
-//         throw new Error(`Graph API request failed with status ${response.status}`);
-//     }
-
-//     return await response.json();
-// }
 
 // Helper functions for getting email details
 function getFromAsync(item) {
@@ -989,21 +763,3 @@ async function showOutlookNotification(title, message) {
         }, resolve);
     });
 }
-// async function refreshTokenIfNeeded() {
-//     const accounts = msalInstance.getAllAccounts();
-//     if (accounts.length === 0) return false;
-
-//     const silentRequest = {
-//         scopes: ["User.Read", "Mail.Send"],
-//         account: accounts[0],
-//         forceRefresh: true
-//     };
-
-//     try {
-//         const response = await msalInstance.acquireTokenSilent(silentRequest);
-//         return true;
-//     } catch (error) {
-//         console.error("Token refresh failed:", error);
-//         return false;
-//     }
-// }
