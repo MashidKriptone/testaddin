@@ -529,7 +529,7 @@ async function prepareEmailDataWithIRM(item) {
         emailBody: body || "",
         timestamp: new Date().toISOString(),
         attachments: attachmentPayloads,
-        serviceProvider: "outlook",
+        serviceProvider: "google",
         irmSettings: {
             ...irmSettings,
             policyName: currentPolicy?.policyName || "Default Policy"
