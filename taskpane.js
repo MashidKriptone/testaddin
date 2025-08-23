@@ -416,7 +416,12 @@ async function onMessageSendHandler(eventArgs) {
             await saveEmailData(emailData);
         } catch (error) {
             console.error('❌ Failed to save email data:', error);
-            await showOutlookNotification("Warning", "Email will be sent but audit logging failed");
+            await showOutlookNotification(
+                "Service Error",
+                "KntrolEMAIL service is unavailable. Email not sent."
+            );
+            eventArgs.completed({ allowEvent: false });
+            return; // 🚨 stop further processing
         }
 
         // 8. All checks passed - allow the email to send
