@@ -650,9 +650,15 @@ async function getEncryptedEmail(emailDataDto) {
             encryptedEmailBody: responseData.encryptedEmailBody
         };
     } catch (error) {
-        console.error("Encryption error:", error);
-        throw error;
-    }
+    console.error("❌ Encryption API failed:", error);
+
+    eventArgs.completed({
+        allowEvent: false,
+        errorMessage: "Encryption failed. Please try again later."
+    });
+
+    return;
+}
 }
 
 // Save email data to server
@@ -676,9 +682,15 @@ async function saveEmailData(emailData) {
 
         return await response.json();
     } catch (error) {
-        console.error("Error saving email data:", error);
-        throw error;
-    }
+    console.error("❌ Failed to save email data:", error);
+
+    eventArgs.completed({
+        allowEvent: false,
+        errorMessage: "KntrolEMAIL service is not reachable. Email not sent."
+    });
+
+    return; 
+}
 }
 
 
