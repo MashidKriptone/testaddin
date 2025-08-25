@@ -353,7 +353,7 @@ function applyPolicyToUI(policy) {
 }
 
 // Main email send handler
-async function onMessageSendHandler(eventArgs) {
+async function onMessageSendHandler(event) {
     const startTime = Date.now();
     console.log('🚀 onMessageSendHandler started at:', new Date().toISOString());
 
@@ -364,7 +364,7 @@ async function onMessageSendHandler(eventArgs) {
                 "Network Error",
                 "You appear to be offline. Please check your network connection."
             );
-            eventArgs.completed({ allowEvent: false });
+            event.completed({ allowEvent: false });
             return;
         }
 
@@ -390,14 +390,14 @@ async function onMessageSendHandler(eventArgs) {
                         encryptedResult.instructionNote || "<p>This email contains encrypted content.</p>"
                     );
 
-                    eventArgs.completed({ allowEvent: true });
+                    event.completed({ allowEvent: true });
                     return;
                 } else {
                     await showOutlookNotification(
                         "Encryption Required",
                         "This email requires encryption but the service is unavailable. Email not sent."
                     );
-                    eventArgs.completed({ allowEvent: false });
+                    event.completed({ allowEvent: false });
                     return;
                 }
             } catch (encryptionError) {
@@ -406,7 +406,7 @@ async function onMessageSendHandler(eventArgs) {
                     "Encryption Failed",
                     "This email requires encryption but the service failed. Email not sent."
                 );
-                eventArgs.completed({ allowEvent: false });
+                event.completed({ allowEvent: false });
                 return;
             }
         }
@@ -420,13 +420,13 @@ async function onMessageSendHandler(eventArgs) {
                 "Service Error",
                 "KntrolEMAIL service is unavailable. Email not sent."
             );
-            eventArgs.completed({ allowEvent: false });
+            event.completed({ allowEvent: false });
             return; // 🚨 stop further processing
         }
 
         // 8. All checks passed - allow the email to send
         await showOutlookNotification("Success", "Email sent with IRM protections");
-        eventArgs.completed({ allowEvent: true });
+        event.completed({ allowEvent: true });
 
     } catch (error) {
         if (isNetworkError(error)) {
@@ -440,7 +440,7 @@ async function onMessageSendHandler(eventArgs) {
                 "We're sorry, an unexpected error occurred. Please try again later."
             );
         }
-        eventArgs.completed({ allowEvent: false });
+        event.completed({ allowEvent: false });
     } finally {
         console.log(`⏱️ Handler completed in ${Date.now() - startTime}ms`);
     }
@@ -651,11 +651,8 @@ async function getEncryptedEmail(emailDataDto) {
         };
     } catch (error) {
     console.error("❌ Encryption API failed:", error);
-
-    eventArgs.completed({
-        allowEvent: false,
-        errorMessage: "Encryption failed. Please try again later."
-    });
+        console.error("Encryption error:", error);
+        throw error;
 
     return;
 }
@@ -684,10 +681,9 @@ async function saveEmailData(emailData) {
     } catch (error) {
     console.error("❌ Failed to save email data:", error);
 
-    eventArgs.completed({
-        allowEvent: false,
-        errorMessage: "KntrolEMAIL service is not reachable. Email not sent."
-    });
+        console.error("Encryption error:", error);
+        throw error;
+
 
     return; 
 }
@@ -782,7 +778,6 @@ async function showOutlookNotification(title, message) {
         Office.context.mailbox.item.notificationMessages.addAsync("notification", {
             type: title.includes("Error") ? "errorMessage" : "informationalMessage",
             message: formattedMessage,
-            icon: "icon1",
             persistent: false
         }, resolve);
     });
