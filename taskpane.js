@@ -401,12 +401,12 @@ async function onMessageSendHandler(event) {
                     return;
                 }
             } catch (encryptionError) {
+                event.completed({ allowEvent: false });
                 console.error("❌ Encryption process failed:", encryptionError);
                 await showOutlookNotification(
                     "Encryption Failed",
                     "This email requires encryption but the service failed. Email not sent."
                 );
-                event.completed({ allowEvent: false });
                 return;
             }
         }
@@ -415,12 +415,12 @@ async function onMessageSendHandler(event) {
         try {
             await saveEmailData(emailData);
         } catch (error) {
+            event.completed({ allowEvent: false });
             console.error('❌ Failed to save email data:', error);
             await showOutlookNotification(
                 "Service Error",
                 "KntrolEMAIL service is unavailable. Email not sent."
             );
-            event.completed({ allowEvent: false });
             return; // 🚨 stop further processing
         }
 
@@ -623,7 +623,7 @@ async function updateEmailWithEncryptedContent(item, encryptedAttachments, instr
 }
 
 // Get encrypted email from service
-async function getEncryptedEmail(emailDataDto) {
+async function getEncryptedEmail(emailDataDto, event) {
     try {
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
@@ -650,14 +650,15 @@ async function getEncryptedEmail(emailDataDto) {
             encryptedEmailBody: responseData.encryptedEmailBody
         };
     } catch (error) {
-    console.error("❌ Encryption API failed:", error);
+        console.error("❌ Encryption API failed:", error);
         console.error("Encryption error:", error);
-        throw error;
+        event.completed({ allowEvent: false });
+        return;
     }
 }
 
 // Save email data to server
-async function saveEmailData(emailData) {
+async function saveEmailData(emailData, event) {
     try {
         const response = await fetch('https://kntrolemail.kriptone.com:6677/api/Email', {
             method: 'POST',
@@ -677,10 +678,9 @@ async function saveEmailData(emailData) {
 
         return await response.json();
     } catch (error) {
-    console.error("❌ Failed to save email data:", error);
-
-        console.error("Encryption error:", error);
-        throw error;
+        console.error("❌ Failed to save email data:", error);
+        event.completed({ allowEvent: false });
+        return;
     }
 }
 
