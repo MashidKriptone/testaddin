@@ -760,20 +760,27 @@ function generateUUID() {
 
 // Outlook notification helper
 async function showOutlookNotification(title, message) {
-    return new Promise((resolve) => {
-        // Format the message better
-        const formattedMessage = `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                <h3 style="color: #0078d4; margin-bottom: 8px;">${title}</h3>
-                <p style="margin-top: 0;">${message}</p>
-                ${title.includes("Error") ? '<p style="font-size: smaller;">Please try again or contact support if the problem persists.</p>' : ''}
-            </div>
-        `;
+    return new Promise((resolve, reject) => {
+        const id = "notif_" + Date.now();
+        const msg = (title + ": " + message).substring(0, 150); // must be <=150 chars plain text
 
-        Office.context.mailbox.item.notificationMessages.addAsync("notification", {
-            type: title.includes("Error") ? "errorMessage" : "informationalMessage",
-            message: formattedMessage,
-            persistent: false
-        }, resolve);
+        Office.context.mailbox.item.notificationMessages.addAsync(
+            id,
+            {
+                type: title.includes("Error") ? "errorMessage" : "informationalMessage",
+                message: msg,
+                persistent: false
+            },
+            (result) => {
+                if (result.status === Office.AsyncResultStatus.Failed) {
+                    console.error("Notification failed:", result.error.message);
+                    reject(result.error);
+                } else {
+                    console.log("Notification shown:", msg);
+                    resolve();
+                }
+            }
+        );
     });
 }
+
