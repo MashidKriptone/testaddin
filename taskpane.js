@@ -383,31 +383,22 @@ async function onMessageSendHandler(event) {
             try {
                 const encryptedResult = await getEncryptedEmail(emailData);
 
-                if (encryptedResult.encryptedAttachments?.length > 0) {
-                    await updateEmailWithEncryptedContent(
-                        item,
-                        encryptedResult.encryptedAttachments,
-                        encryptedResult.instructionNote || "<p>This email contains encrypted content.</p>"
-                    );
-
-                    event.completed({ allowEvent: true });
-                    return;
-                } else {
+                if (!encryptedResult || !encryptedResult.encryptedAttachments?.length) {
                     await showOutlookNotification(
-                        "Encryption Required",
-                        "This email requires encryption but the service is unavailable. Email not sent."
+                        "Encryption Error",
+                        "No encrypted data was returned. Email not sent."
                     );
                     event.completed({ allowEvent: false });
                     return;
                 }
-            } catch (encryptionError) {
-                console.error("❌ Encryption process failed:", encryptionError);
-                await showOutlookNotification(
-                    "Encryption Failed",
-                    "This email requires encryption but the service failed. Email not sent."
-                );
+
+                await updateEmailWithEncryptedContent(item, encryptedResult.encryptedAttachments);
+                event.completed({ allowEvent: true });
+
+            } catch (error) {
+                console.error("❌ Unexpected error:", error);
+                await showOutlookNotification("Error", "Unexpected error. Email not sent.");
                 event.completed({ allowEvent: false });
-                return;
             }
         }
 
@@ -650,12 +641,12 @@ async function getEncryptedEmail(emailDataDto) {
             encryptedEmailBody: responseData.encryptedEmailBody
         };
     } catch (error) {
-    console.error("❌ Encryption API failed:", error);
+        console.error("❌ Encryption API failed:", error);
         console.error("Encryption error:", error);
         throw error;
 
-    return;
-}
+        return;
+    }
 }
 
 // Save email data to server
@@ -679,14 +670,14 @@ async function saveEmailData(emailData) {
 
         return await response.json();
     } catch (error) {
-    console.error("❌ Failed to save email data:", error);
+        console.error("❌ Failed to save email data:", error);
 
         console.error("Encryption error:", error);
         throw error;
 
 
-    return; 
-}
+        return;
+    }
 }
 
 
