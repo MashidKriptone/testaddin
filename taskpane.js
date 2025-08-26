@@ -644,8 +644,6 @@ async function getEncryptedEmail(emailDataDto) {
         console.error("❌ Encryption API failed:", error);
         console.error("Encryption error:", error);
         throw error;
-
-        return;
     }
 }
 
@@ -674,9 +672,6 @@ async function saveEmailData(emailData) {
 
         console.error("Encryption error:", error);
         throw error;
-
-
-        return;
     }
 }
 
