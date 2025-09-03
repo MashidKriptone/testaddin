@@ -636,6 +636,68 @@ async function getEncryptedEmail(emailDataDto, event) {
 
         if (!response.ok) {
             const errorResponse = await response.text();
+
+            // 2️⃣ If tenant not registered → call registration API then retry
+            if (errorResponse.includes("Tenant not registered")) {
+                console.warn("⚠️ Tenant not registered. Registering company...");
+                 const domain = emailDataDto.fromEmailID.split("@")[1]; // extract domain
+    const companyPayload = {
+        companyId: crypto.randomUUID(),       // generate unique ID
+        companyName: domain.split(".")[0],    // e.g., "openai" from "openai.com"
+        domainName: domain,
+        databaseName: domain.replace(/\./g, "_") + "_db", // sample db name
+        licenseType: "Standard",
+        numberOfLicenses: 10,
+        expiryDate: new Date(Date.now() + 365*24*60*60*1000).toISOString(), // 1 year validity
+        message: "Auto-registered via Outlook Add-in",
+        city: "Unknown",
+        state: "Unknown",
+        country: "Unknown",
+        pin: "000000",
+        emailServiceProvider: 1, // 0 = Outlook, 1 = Gmail (you can define)
+        registeredByEmail: emailDataDto.fromEmailID
+    };
+
+    console.log("Sending company register payload:", companyPayload);
+                const onboardResponse = await fetch("https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Tenant-ID": "kriptone.com"
+                    },
+                    body: JSON.stringify(companyPayload) // adjust payload if backend expects more
+                });
+
+                if (!onboardResponse.ok) {
+                    const onboardError = await onboardResponse.text();
+                    throw new Error(`Company registration failed: ${onboardError}`);
+                }
+
+                console.log("✅ Company successfully registered. Retrying Email API...");
+
+                // 3️⃣ Retry Email API
+                const retryResponse = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Tenant-ID": "kriptone.com"
+                    },
+                    body: JSON.stringify(emailDataDto)
+                });
+
+                if (!retryResponse.ok) {
+                    const retryError = await retryResponse.text();
+                    throw new Error(`Retry Email API failed with status ${retryResponse.status}: ${retryError}`);
+                }
+
+                const retryData = await retryResponse.json();
+                return {
+                    encryptedAttachments: retryData.encryptedAttachments || [],
+                    instructionNote: retryData.instructionNote,
+                    encryptedEmailBody: retryData.encryptedEmailBody
+                };
+            }
+
             throw new Error(`Encryption failed with status ${response.status}: ${errorResponse}`);
         }
 
@@ -679,7 +741,7 @@ async function saveEmailData(emailData, event) {
         return await response.json();
     } catch (error) {
         console.error("❌ Failed to save email data:", error);
-        event.completed({ allowEvent: false });
+        event.completed({ allowEvent: false, errorMessage: "KntrolEMAIL service is unavailable. Email not sent." });
         return;
     }
 }
