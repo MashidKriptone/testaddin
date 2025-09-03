@@ -623,7 +623,7 @@ async function updateEmailWithEncryptedContent(item, encryptedAttachments, instr
 }
 
 // Get encrypted email from service
-async function getEncryptedEmail(emailDataDto, event) {
+async function getEncryptedEmail(emailDataDto) {
     try {
         const response = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
             method: "POST",
@@ -637,85 +637,67 @@ async function getEncryptedEmail(emailDataDto, event) {
         if (!response.ok) {
             const errorResponse = await response.text();
 
-            // 2️⃣ If tenant not registered → call registration API then retry
+            // 🔴 Case: Tenant not registered
             if (errorResponse.includes("Tenant not registered")) {
                 console.warn("⚠️ Tenant not registered. Registering company...");
-                 const domain = emailDataDto.fromEmailID.split("@")[1]; // extract domain
-    const companyPayload = {
-        companyId: generateUUID(),       // generate unique ID
-        companyName: domain.split(".")[0],    // e.g., "openai" from "openai.com"
-        domainName: domain,
-        databaseName: domain.replace(/\./g, "_") + "_db", // sample db name
-        licenseType: "Standard",
-        numberOfLicenses: 10,
-        expiryDate: new Date(Date.now() + 365*24*60*60*1000).toISOString(), // 1 year validity
-        message: "Auto-registered via Outlook Add-in",
-        city: "Unknown",
-        state: "Unknown",
-        country: "Unknown",
-        pin: "000000",
-        emailServiceProvider: 1, // 0 = Outlook, 1 = Gmail (you can define)
-        registeredByEmail: "mashid.khan@kriptone.com"
-    };
 
-    console.log("Sending company register payload:", companyPayload);
-                const onboardResponse = await fetch("https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Tenant-ID": "kriptone.com"
-                    },
-                    body: JSON.stringify(companyPayload) // adjust payload if backend expects more
-                });
-
-                if (!onboardResponse.ok) {
-                    const onboardError = await onboardResponse.text();
-                    console.error("❌ Encryption API failed:", onboardError);
-                }
-
-                console.log("✅ Company successfully registered. Retrying Email API...");
-
-                // 3️⃣ Retry Email API
-                const retryResponse = await fetch("https://kntrolemail.kriptone.com:6677/api/Email", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Tenant-ID": "kriptone.com"
-                    },
-                    body: JSON.stringify(emailDataDto)
-                });
-
-                if (!retryResponse.ok) {
-                    const retryError = await retryResponse.text();
-                    throw new Error(`Retry Email API failed with status ${retryResponse.status}: ${retryError}`);
-                }
-
-                const retryData = await retryResponse.json();
-                return {
-                    encryptedAttachments: retryData.encryptedAttachments || [],
-                    instructionNote: retryData.instructionNote,
-                    encryptedEmailBody: retryData.encryptedEmailBody
+                const domain = emailDataDto.fromEmailID.split("@")[1]; 
+                const companyPayload = {
+                    companyId: generateUUID(),
+                    companyName: domain.split(".")[0],
+                    domainName: domain,
+                    databaseName: domain.replace(/\./g, "_") + "_db",
+                    licenseType: "Standard",
+                    numberOfLicenses: 10,
+                    expiryDate: new Date(Date.now() + 365*24*60*60*1000).toISOString(),
+                    message: "Auto-registered via Outlook Add-in",
+                    city: "Unknown",
+                    state: "Unknown",
+                    country: "Unknown",
+                    pin: "000000",
+                    emailServiceProvider: 1,
+                    registeredByEmail: emailDataDto.fromEmailID
                 };
+
+                try {
+                    const onboardResponse = await fetch("https://kntrolemail.kriptone.com:6677/api/CompanyRegistration/onboarding", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Tenant-ID": "kriptone.com"
+                        },
+                        body: JSON.stringify(companyPayload)
+                    });
+
+                    if (!onboardResponse.ok) {
+                        console.error("❌ Company registration failed:", await onboardResponse.text());
+                    } else {
+                        console.log("✅ Company registered.");
+                    }
+                } catch (e) {
+                    console.error("❌ Error during company registration:", e);
+                }
+
+                // ✅ Always retry Email API after attempting company registration
+                console.log("🔄 Retrying Email API after company registration...");
+                return await getEncryptedEmail(emailDataDto);
             }
 
-            throw new Error(`Encryption failed with status ${response.status}: ${errorResponse}`);
+            // Other errors
+            console.error("❌ Encryption failed:", errorResponse);
+            return null;
         }
 
+        // Success case
         const responseData = await response.json();
-        if (!responseData.encryptedAttachments || responseData.encryptedAttachments.length === 0) {
-            throw new Error("API response missing encrypted attachments");
-        }
-
         return {
             encryptedAttachments: responseData.encryptedAttachments || [],
             instructionNote: responseData.instructionNote,
             encryptedEmailBody: responseData.encryptedEmailBody
         };
     } catch (error) {
-        console.error("❌ Encryption API failed:", error);
-        console.error("Encryption error:", error);
-        // event.completed({ allowEvent: false });
-        return;
+        console.error("❌ Encryption API error:", error);
+        return null;
     }
 }
 
