@@ -642,7 +642,7 @@ async function getEncryptedEmail(emailDataDto, event) {
                 console.warn("⚠️ Tenant not registered. Registering company...");
                  const domain = emailDataDto.fromEmailID.split("@")[1]; // extract domain
     const companyPayload = {
-        companyId: crypto.randomUUID(),       // generate unique ID
+        companyId: generateUUID(),       // generate unique ID
         companyName: domain.split(".")[0],    // e.g., "openai" from "openai.com"
         domainName: domain,
         databaseName: domain.replace(/\./g, "_") + "_db", // sample db name
