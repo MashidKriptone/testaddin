@@ -714,7 +714,7 @@ async function getEncryptedEmail(emailDataDto, event) {
     } catch (error) {
         console.error("❌ Encryption API failed:", error);
         console.error("Encryption error:", error);
-        event.completed({ allowEvent: false });
+        // event.completed({ allowEvent: false });
         return;
     }
 }
