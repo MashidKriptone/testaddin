@@ -655,7 +655,7 @@ async function getEncryptedEmail(emailDataDto, event) {
         country: "Unknown",
         pin: "000000",
         emailServiceProvider: 1, // 0 = Outlook, 1 = Gmail (you can define)
-        registeredByEmail: emailDataDto.fromEmailID
+        registeredByEmail: "mashid.khan@kriptone.com"
     };
 
     console.log("Sending company register payload:", companyPayload);
