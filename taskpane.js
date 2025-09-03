@@ -670,7 +670,7 @@ async function getEncryptedEmail(emailDataDto, event) {
 
                 if (!onboardResponse.ok) {
                     const onboardError = await onboardResponse.text();
-                    throw new Error(`Company registration failed: ${onboardError}`);
+                    console.error("❌ Encryption API failed:", onboardError);
                 }
 
                 console.log("✅ Company successfully registered. Retrying Email API...");
